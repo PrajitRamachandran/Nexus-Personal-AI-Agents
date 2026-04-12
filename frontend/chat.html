@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Chat</title>
+  <title>Nexus AI</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="chat-page">
@@ -11,321 +11,372 @@
 
     <div class="sidebar">
       <div class="sidebar-header">
-        <strong>AI Platform</strong>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="url(#gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <defs>
+            <linearGradient id="gradient" x1="0" y1="0" x2="24" y2="24">
+              <stop offset="0%" stop-color="#6366f1"/>
+              <stop offset="100%" stop-color="#8b5cf6"/>
+            </linearGradient>
+          </defs>
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        Nexus AI
       </div>
 
-      <button id="new-chat-btn">+ New Chat</button>
+      <button id="new-chat-btn">New Chat</button>
 
       <div id="conversation-list"></div>
 
       <div class="sidebar-footer">
-        <span id="username-display"></span>
-        <button id="logout-btn">Sign out</button>
+        <div class="user-profile">
+          <span id="username-display"><span class="avatar-sm"></span>User</span>
+          <button id="logout-btn">Sign out</button>
+        </div>
+        <div class="app-version">Nexus AI v1.0.0</div>
       </div>
     </div>
 
     <div class="main">
       <header class="chat-header">
-        <span class="header-title">Chat</span>
-        <a href="./logs.html" class="logs-link">Logs</a>
+        <span class="header-title" id="current-chat-title">Current Conversation</span>
+        <a href="./logs.html" class="logs-link">View Logs</a>
       </header>
 
       <div id="messages" class="messages">
-        <p id="empty-hint" class="empty-hint">Send a message to start chatting.</p>
+        <div id="empty-hint" class="empty-hint">
+          <h1>Nexus AI</h1>
+          <p>Your intelligent AI workspace</p>
+        </div>
       </div>
 
-      <div id="stats-bar" class="stats-bar hidden"></div>
-
-      <div class="input-row">
-        <textarea id="input" placeholder="Message... (Enter to send, Shift+Enter for newline)" rows="1"></textarea>
-        <button id="send-btn">Send</button>
+      <div class="input-area-wrapper">
+        <div id="stats-bar" class="stats-bar hidden"></div>
+        <div class="input-row">
+          <textarea id="input" placeholder="Message Nexus AI... (Shift+Enter for newline)" rows="1"></textarea>
+          <button id="send-btn" aria-label="Send">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
   <script type="module">
     import { api } from './api.js'
-import { auth } from './auth.js'
+    import { auth } from './auth.js'
 
-if (!auth.isLoggedIn()) window.location.href = './login.html'
+    if (!auth.isLoggedIn()) window.location.href = './login.html'
 
-const messagesEl = document.getElementById('messages')
-const inputEl = document.getElementById('input')
-const sendBtn = document.getElementById('send-btn')
-const emptyHint = document.getElementById('empty-hint')
-const statsBar = document.getElementById('stats-bar')
-const usernameEl = document.getElementById('username-display')
-const logoutBtn = document.getElementById('logout-btn')
-const convoList = document.getElementById('conversation-list')
-const newChatBtn = document.getElementById('new-chat-btn')
+    const messagesEl = document.getElementById('messages')
+    const inputEl = document.getElementById('input')
+    const sendBtn = document.getElementById('send-btn')
+    const emptyHint = document.getElementById('empty-hint')
+    const statsBar = document.getElementById('stats-bar')
+    const usernameEl = document.getElementById('username-display')
+    const logoutBtn = document.getElementById('logout-btn')
+    const convoList = document.getElementById('conversation-list')
+    const newChatBtn = document.getElementById('new-chat-btn')
+    const currentChatTitle = document.getElementById('current-chat-title')
 
-let currentConversationId = null
+    let currentConversationId = null
 
-usernameEl.textContent = auth.getUsername()
+    // Inject Username into nice UI
+    usernameEl.innerHTML = `<span class="avatar-sm"></span> ${auth.getUsername()}`
 
-logoutBtn.addEventListener('click', () => {
-  auth.logout()
-  window.location.href = './login.html'
-})
-
-sendBtn.addEventListener('click', () => void sendMessage())
-newChatBtn.addEventListener('click', () => void createNewConversation())
-
-inputEl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    void sendMessage()
-  }
-})
-inputEl.addEventListener('input', () => {
-  inputEl.style.height = 'auto'
-  inputEl.style.height = inputEl.scrollHeight + 'px'
-})
-
-document.addEventListener('click', () => {
-  document.querySelectorAll('.dropdown').forEach(d => d.classList.add('hidden'))
-})
-
-function createBubble(role) {
-  const div = document.createElement('div')
-  div.className = `message ${role}`
-
-  const label = document.createElement('span')
-  label.className = 'role-label'
-  label.textContent = role === 'user' ? 'You' : 'AI'
-
-  const p = document.createElement('p')
-
-  div.append(label, p)
-  messagesEl.appendChild(div)
-  return div
-}
-
-function appendMessage(role, content) {
-  const div = createBubble(role)
-  div.querySelector('p').textContent = content
-
-  messagesEl.appendChild(div)
-
-  messagesEl.scrollTop = messagesEl.scrollHeight
-}
-
-function clearMessages() {
-  messagesEl.innerHTML = ''
-}
-
-function showEmptyState() {
-  emptyHint.style.display = 'block'
-}
-
-function hideEmptyState() {
-  emptyHint.style.display = 'none'
-}
-
-function showStats(meta) {
-  statsBar.classList.remove('hidden')
-  statsBar.innerHTML = `
-    <span>Model: <strong>${meta.model ?? '-'}</strong></span>
-    <span>Prompt: <strong>${meta.prompt_tokens ?? '-'}</strong></span>
-    <span>Response: <strong>${meta.response_tokens ?? '-'}</strong></span>
-    <span>Total: <strong>${meta.total_tokens ?? '-'}</strong></span>
-    <span>Time: <strong>${meta.duration_ms ?? '-'} ms</strong></span>
-  `
-}
-
-function setLoading(on) {
-  sendBtn.disabled = on
-  sendBtn.textContent = on ? 'Sending...' : 'Send'
-}
-
-async function loadConversations() {
-  const convos = await api.conversations()
-  convoList.innerHTML = ''
-
-  convos.forEach(c => {
-    const item = document.createElement('div')
-    item.className = 'conversation-item'
-
-    // ACTIVE HIGHLIGHT
-    if (c.id === currentConversationId) {
-      item.classList.add('active')
-    }
-
-    item.onclick = () => loadConversation(c.id)
-
-    const title = document.createElement('span')
-    title.textContent = c.title
-
-const menuWrapper = document.createElement('div')
-menuWrapper.className = 'menu-wrapper'
-
-// 3 DOT BUTTON
-const menuBtn = document.createElement('button')
-menuBtn.className = 'menu-btn'
-menuBtn.textContent = '⋮'
-
-// DROPDOWN
-const dropdown = document.createElement('div')
-dropdown.className = 'dropdown hidden'
-
-// PIN
-const pinBtn = document.createElement('div')
-pinBtn.className = 'dropdown-item'
-pinBtn.textContent = 'Pin'
-pinBtn.onclick = async (e) => {
-  e.stopPropagation()
-  await api.togglePin(c.id)
-  await loadConversations()
-}
-
-// RENAME
-const renameBtn = document.createElement('div')
-renameBtn.className = 'dropdown-item'
-renameBtn.textContent = 'Rename'
-renameBtn.onclick = async (e) => {
-  e.stopPropagation()
-
-  const newTitle = prompt('Enter new name:')
-  if (!newTitle) return
-
-  await api.renameConversation(c.id, newTitle)
-  await loadConversations()
-
-  if (c.id === currentConversationId) {
-    await loadConversation(c.id)
-  }
-}
-
-// DELETE
-const deleteBtn = document.createElement('div')
-deleteBtn.className = 'dropdown-item delete'
-deleteBtn.textContent = 'Delete'
-deleteBtn.onclick = async (e) => {
-  e.stopPropagation()
-  await deleteConversation(c.id)
-}
-
-// TOGGLE DROPDOWN
-menuBtn.onclick = (e) => {
-  e.stopPropagation()
-
-  document.querySelectorAll('.dropdown').forEach(d => {
-    if (d !== dropdown) d.classList.add('hidden')
-  })
-
-  dropdown.classList.toggle('hidden')
-}
-
-dropdown.append(pinBtn, renameBtn, deleteBtn)
-menuWrapper.append(menuBtn, dropdown)
-item.append(title, menuWrapper)
-
-    convoList.appendChild(item)
-  })
-
-  return convos
-}
-
-async function loadConversation(id) {
-  const data = await api.getConversation(id)
-  currentConversationId = id
-
-  clearMessages()
-  statsBar.classList.add('hidden')
-
-  if (!data.messages.length) {
-    showEmptyState()
-  } else {
-    hideEmptyState()
-    data.messages.forEach(m => appendMessage(m.role, m.content))
-  }
-
-  await loadConversations()
-}
-
-async function createNewConversation() {
-  const convo = await api.createConversation('New Chat')
-  currentConversationId = convo.id
-  clearMessages()
-  showEmptyState()
-  await loadConversations()
-}
-
-async function deleteConversation(id) {
-  await api.deleteConversation(id)
-
-  if (currentConversationId === id) {
-    currentConversationId = null
-    clearMessages()
-    showEmptyState()
-  }
-
-  const convos = await loadConversations()
-  if (convos.length > 0 && !currentConversationId) {
-    await loadConversation(convos[0].id)
-  }
-}
-
-async function sendMessage() {
-  const text = inputEl.value.trim()
-  if (!text || sendBtn.disabled) return
-
-  if (!currentConversationId) {
-    const convo = await api.createConversation('New Chat')
-    currentConversationId = convo.id
-    await loadConversations()
-  }
-
-  hideEmptyState()
-  inputEl.value = ''
-  setLoading(true)
-  inputEl.disabled = true
-  inputEl.focus()
-
-  appendMessage('user', text)
-
-  const bubble = createBubble('assistant')
-  const contentEl = bubble.querySelector('p')
-  contentEl.innerHTML = `<span class="typing">AI is typing...</span>`
-  let fullReply = ''
-
-  try {
-    await api.chatStream({
-      conversation_id: currentConversationId,
-      message: text,
-      onToken(token) {
-  fullReply += token
-  contentEl.textContent = fullReply
-
-  messagesEl.scrollTop = messagesEl.scrollHeight
-},
-      onDone(meta) {
-        showStats(meta)
-      },
-      onError(err) {
-        contentEl.textContent = err
-      }
+    logoutBtn.addEventListener('click', () => {
+      auth.logout()
+      window.location.href = './login.html'
     })
 
-    await loadConversations()
-  } catch (err) {
-    contentEl.textContent = err.message
-  } finally {
-    setLoading(false)
-  }
-}
+    sendBtn.addEventListener('click', () => void sendMessage())
+    newChatBtn.addEventListener('click', () => void createNewConversation())
 
-async function init() {
-  const convos = await loadConversations()
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        void sendMessage()
+      }
+    })
+    inputEl.addEventListener('input', () => {
+      inputEl.style.height = 'auto'
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 200) + 'px'
+    })
 
-  if (convos.length > 0) {
-    await loadConversation(convos[0].id)
-  } else {
-    showEmptyState()
-  }
-}
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.dropdown').forEach(d => d.classList.add('hidden'))
+    })
 
-init()
+    // DOM Generation completely upgraded for ChatGPT style
+    function createBubble(role) {
+      const div = document.createElement('div')
+      div.className = `message ${role}`
+
+      const avatar = document.createElement('div')
+      avatar.className = 'message-avatar'
+      avatar.textContent = role === 'user' ? 'U' : 'AI'
+
+      const content = document.createElement('div')
+      content.className = 'message-content'
+
+      const label = document.createElement('span')
+      label.className = 'role-label'
+      label.textContent = role === 'user' ? 'You' : 'Nexus AI'
+
+      const p = document.createElement('p')
+
+      content.append(label, p)
+      div.append(avatar, content)
+      messagesEl.appendChild(div)
+      return div
+    }
+
+    function appendMessage(role, content) {
+      const div = createBubble(role)
+      div.querySelector('p').textContent = content
+      messagesEl.scrollTop = messagesEl.scrollHeight
+    }
+
+    function clearMessages() {
+      // Retain the empty hint element
+      messagesEl.innerHTML = ''
+      messagesEl.appendChild(emptyHint)
+    }
+
+    function showEmptyState() {
+      emptyHint.style.display = 'block'
+      currentChatTitle.textContent = "New Conversation"
+    }
+
+    function hideEmptyState() {
+      emptyHint.style.display = 'none'
+    }
+
+    function showStats(meta) {
+      statsBar.classList.remove('hidden')
+      statsBar.innerHTML = `
+        <span>Model: <strong>${meta.model ?? '-'}</strong></span> • 
+        <span>Prompt: <strong>${meta.prompt_tokens ?? '-'}</strong></span> • 
+        <span>Response: <strong>${meta.response_tokens ?? '-'}</strong></span> • 
+        <span>Time: <strong>${meta.duration_ms ?? '-'} ms</strong></span>
+      `
+    }
+
+    function setLoading(on) {
+      sendBtn.disabled = on
+      inputEl.style.opacity = on ? '0.6' : '1'
+    }
+
+    function renderConvoItem(c) {
+      const item = document.createElement('div')
+      item.className = 'conversation-item'
+      if (c.id === currentConversationId) {
+        item.classList.add('active')
+        currentChatTitle.textContent = c.title
+      }
+
+      item.onclick = () => loadConversation(c.id)
+
+      const wrapper = document.createElement('div')
+      wrapper.className = 'chat-title-wrapper'
+      
+      // Icon depending on pin status
+      const icon = document.createElement('span')
+      icon.innerHTML = c.pinned ? '📌' : '💬'
+      icon.style.opacity = '0.7'
+      icon.style.fontSize = '12px'
+
+      const title = document.createElement('span')
+      title.textContent = c.title
+      
+      wrapper.append(icon, title)
+
+      const menuWrapper = document.createElement('div')
+      menuWrapper.className = 'menu-wrapper'
+
+      const menuBtn = document.createElement('button')
+      menuBtn.className = 'menu-btn'
+      menuBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+      `
+
+      const dropdown = document.createElement('div')
+      dropdown.className = 'dropdown hidden'
+
+      const pinBtn = document.createElement('div')
+      pinBtn.className = 'dropdown-item'
+      pinBtn.textContent = c.pinned ? 'Unpin' : 'Pin'
+      pinBtn.onclick = async (e) => {
+        e.stopPropagation()
+        await api.togglePin(c.id)
+        await loadConversations()
+      }
+
+      const renameBtn = document.createElement('div')
+      renameBtn.className = 'dropdown-item'
+      renameBtn.textContent = 'Rename'
+      renameBtn.onclick = async (e) => {
+        e.stopPropagation()
+        const newTitle = prompt('Enter new name:', c.title)
+        if (!newTitle) return
+        await api.renameConversation(c.id, newTitle)
+        await loadConversations()
+        if (c.id === currentConversationId) await loadConversation(c.id)
+      }
+
+      const deleteBtn = document.createElement('div')
+      deleteBtn.className = 'dropdown-item delete'
+      deleteBtn.textContent = 'Delete'
+      deleteBtn.onclick = async (e) => {
+        e.stopPropagation()
+        if(confirm('Delete this conversation?')) {
+          await deleteConversation(c.id)
+        }
+      }
+
+      menuBtn.onclick = (e) => {
+        e.stopPropagation()
+        document.querySelectorAll('.dropdown').forEach(d => {
+          if (d !== dropdown) d.classList.add('hidden')
+        })
+        dropdown.classList.toggle('hidden')
+      }
+
+      dropdown.append(pinBtn, renameBtn, deleteBtn)
+      menuWrapper.append(menuBtn, dropdown)
+      item.append(wrapper, menuWrapper)
+      convoList.appendChild(item)
+    }
+
+    async function loadConversations() {
+      const convos = await api.conversations()
+      convoList.innerHTML = ''
+
+      // Logic to separate pinned vs unpinned
+      const pinned = convos.filter(c => c.pinned)
+      const unpinned = convos.filter(c => !c.pinned)
+
+      if(pinned.length > 0) {
+        const lbl = document.createElement('div');
+        lbl.className = 'sidebar-label'; lbl.textContent = 'Pinned';
+        convoList.appendChild(lbl);
+        pinned.forEach(c => renderConvoItem(c));
+      }
+
+      if(unpinned.length > 0) {
+        const lbl = document.createElement('div');
+        lbl.className = 'sidebar-label'; lbl.textContent = 'Recent';
+        convoList.appendChild(lbl);
+        unpinned.forEach(c => renderConvoItem(c));
+      }
+
+      return convos
+    }
+
+    async function loadConversation(id) {
+      const data = await api.getConversation(id)
+      currentConversationId = id
+
+      clearMessages()
+      statsBar.classList.add('hidden')
+
+      if (!data.messages.length) {
+        showEmptyState()
+      } else {
+        hideEmptyState()
+        data.messages.forEach(m => appendMessage(m.role, m.content))
+      }
+
+      await loadConversations()
+    }
+
+    async function createNewConversation() {
+      const convo = await api.createConversation('New Chat')
+      currentConversationId = convo.id
+      clearMessages()
+      showEmptyState()
+      await loadConversations()
+    }
+
+    async function deleteConversation(id) {
+      await api.deleteConversation(id)
+
+      if (currentConversationId === id) {
+        currentConversationId = null
+        clearMessages()
+        showEmptyState()
+      }
+
+      const convos = await loadConversations()
+      if (convos.length > 0 && !currentConversationId) {
+        await loadConversation(convos[0].id)
+      }
+    }
+
+    async function sendMessage() {
+      const text = inputEl.value.trim()
+      if (!text || sendBtn.disabled) return
+
+      if (!currentConversationId) {
+        const convo = await api.createConversation('New Chat')
+        currentConversationId = convo.id
+        await loadConversations()
+      }
+
+      hideEmptyState()
+      inputEl.value = ''
+      inputEl.style.height = 'auto' // Reset height
+      setLoading(true)
+      inputEl.disabled = true
+      inputEl.focus()
+
+      appendMessage('user', text)
+
+      const bubble = createBubble('assistant')
+      const contentEl = bubble.querySelector('p')
+      contentEl.innerHTML = `<span class="typing"></span>`
+      let fullReply = ''
+
+      try {
+        await api.chatStream({
+          conversation_id: currentConversationId,
+          message: text,
+          onToken(token) {
+            fullReply += token
+            contentEl.textContent = fullReply
+            messagesEl.scrollTop = messagesEl.scrollHeight
+          },
+          onDone(meta) {
+            showStats(meta)
+          },
+          onError(err) {
+            contentEl.textContent = err
+          }
+        })
+
+        await loadConversations()
+      } catch (err) {
+        contentEl.textContent = err.message
+      } finally {
+        setLoading(false)
+        inputEl.disabled = false
+        inputEl.focus()
+      }
+    }
+
+    async function init() {
+      const convos = await loadConversations()
+
+      if (convos.length > 0) {
+        await loadConversation(convos[0].id)
+      } else {
+        showEmptyState()
+      }
+    }
+
+    init()
   </script>
 </body>
 </html>

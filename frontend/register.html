@@ -2,18 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Register</title>
+  <title>Register | Nexus AI</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="auth-page">
   <div class="auth-card">
-    <h1>Create account</h1>
+    <div class="auth-brand">
+      <h1>Nexus AI</h1>
+      <p>Create your account</p>
+    </div>
+    
     <p id="error" class="error hidden"></p>
-    <input id="username" type="text" placeholder="Username" />
-    <input id="email" type="email" placeholder="Email" />
-    <input id="password" type="password" placeholder="Password (min 8 chars)" />
+    
+    <input id="username" type="text" placeholder="Username" autocomplete="username" />
+    <input id="email" type="email" placeholder="Email address" autocomplete="email" />
+    <input id="password" type="password" placeholder="Password (min 8 chars)" autocomplete="new-password" />
     <button id="submit-btn">Create account</button>
-    <p class="switch-link">Have an account? <a href="./login.html">Sign in</a></p>
+    
+    <p class="switch-link">Already have an account? <a href="./login.html">Sign in</a></p>
   </div>
 
   <script type="module">
@@ -30,10 +36,10 @@
       const email    = document.getElementById('email').value.trim()
       const password = document.getElementById('password').value
 
-      if (!username || !email || !password) return showError('All fields required')
+      if (!username || !email || !password) return showError('All fields are required')
 
       btn.disabled = true
-      btn.textContent = 'Creating…'
+      btn.textContent = 'Creating account…'
       errorEl.classList.add('hidden')
 
       try {
@@ -45,6 +51,10 @@
         btn.disabled = false
         btn.textContent = 'Create account'
       }
+    })
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') btn.click()
     })
 
     function showError(msg) {

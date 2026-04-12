@@ -1,59 +1,64 @@
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-    <meta charset="UTF-8">
-    <title>Sign in</title>
-    <link rel="stylesheet" href="styles.css">
-    </head>
-    <body class="auth-page">
-    <div class="auth-card">
-        <h1>Sign in</h1>
-        <p id="error" class="error hidden"></p>
-        <input id="email" type="email" placeholder="Email" />
-        <input id="password" type="password" placeholder="Password" />
-        <button id="submit-btn">Sign in</button>
-        <p class="switch-link">No account? <a href="./register.html">Register</a></p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sign in | Nexus AI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="auth-page">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <h1>Nexus AI</h1>
+      <p>Sign in to your workspace</p>
     </div>
+    
+    <p id="error" class="error hidden"></p>
+    
+    <input id="email" type="email" placeholder="Email address" autocomplete="email" />
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+    <button id="submit-btn">Continue</button>
+    
+    <p class="switch-link">Don't have an account? <a href="./register.html">Sign up</a></p>
+  </div>
 
-    <script type="module">
-        import { api } from './api.js'
-        import { auth } from './auth.js'
+  <script type="module">
+    import { api } from './api.js'
+    import { auth } from './auth.js'
 
-        if (auth.isLoggedIn()) window.location.href = './chat.html'
+    if (auth.isLoggedIn()) window.location.href = './chat.html'
 
-        const errorEl = document.getElementById('error')
-        const btn = document.getElementById('submit-btn')
+    const errorEl = document.getElementById('error')
+    const btn = document.getElementById('submit-btn')
 
-        btn.addEventListener('click', async () => {
-        const email    = document.getElementById('email').value.trim()
-        const password = document.getElementById('password').value
+    btn.addEventListener('click', async () => {
+      const email    = document.getElementById('email').value.trim()
+      const password = document.getElementById('password').value
 
-        if (!email || !password) return showError('All fields required')
+      if (!email || !password) return showError('All fields are required')
 
-        btn.disabled = true
-        btn.textContent = 'Signing in…'
-        errorEl.classList.add('hidden')
+      btn.disabled = true
+      btn.textContent = 'Signing in…'
+      errorEl.classList.add('hidden')
 
-        try {
-            const data = await api.login({ email, password })
-            auth.login(data.token, data.username)
-            window.location.href = './chat.html'
-        } catch (err) {
-            showError(err.message)
-            btn.disabled = false
-            btn.textContent = 'Sign in'
-        }
-        })
+      try {
+        const data = await api.login({ email, password })
+        auth.login(data.token, data.username)
+        window.location.href = './chat.html'
+      } catch (err) {
+        showError(err.message)
+        btn.disabled = false
+        btn.textContent = 'Continue'
+      }
+    })
 
-        // Allow Enter key to submit
-        document.addEventListener('keydown', e => {
-        if (e.key === 'Enter') btn.click()
-        })
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') btn.click()
+    })
 
-        function showError(msg) {
-        errorEl.textContent = msg
-        errorEl.classList.remove('hidden')
-        }
-    </script>
-    </body>
-    </html>
+    function showError(msg) {
+      errorEl.textContent = msg
+      errorEl.classList.remove('hidden')
+    }
+  </script>
+</body>
+</html>

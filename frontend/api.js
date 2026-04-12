@@ -11,7 +11,6 @@ function resolveApiBase() {
   return `http://${host}:3001`
 }
 
-
 const BASE = resolveApiBase()
 
 async function readJsonOrText(res) {
@@ -77,9 +76,10 @@ export const api = {
   }),
 
   // ===== LOGS =====
-  logs: () => request('/api/logs'),
+  // Changed from 'logs' to 'getLogs' to fix the "api.getLogs is not a function" error
+  getLogs: () => request('/api/logs'),
 
-  // ===== CONVERSATIONS (NEW) =====
+  // ===== CONVERSATIONS =====
   conversations: () => request('/api/conversations'),
 
   createConversation: (title) =>

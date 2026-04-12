@@ -2,11 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>AI Platform</title>
+  <title>Nexus AI</title>
+  <style>
+    body { background-color: #0d0d0f; margin: 0; padding: 0; }
+  </style>
   <script type="module">
     import { auth } from './auth.js'
-    window.location.replace(auth.isLoggedIn() ? '/chat.html' : '/login.html')
+    
+    // Instantly route user based on auth state
+    if (auth.isLoggedIn()) {
+      window.location.replace('./chat.html')
+    } else {
+      window.location.replace('./login.html')
+    }
   </script>
 </head>
-<body></body>
+<body>
+</body>
 </html>
