@@ -52,11 +52,27 @@ body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #f0f0f0; 
 .empty-hint { color: #444; text-align: center; margin-top: 4rem; }
 
 .message {
-  max-width: 720px; padding: 0.75rem 1rem;
-  border-radius: 10px; line-height: 1.6;
+  animation: fadeIn 0.2s ease-in;
 }
-.message.user      { background: #1e1e2e; border: 1px solid #2d2d4d; align-self: flex-end; }
-.message.assistant { background: #1a1a1a; border: 1px solid #2a2a2a; align-self: flex-start; }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message.user {
+  text-align: right;
+}
+
+.message.assistant {
+  text-align: left;
+}
 .message.error-msg { border-color: #4d2d2d; }
 
 .role-label { display: block; font-size: 12px; font-weight: 500; color: #666; margin-bottom: 4px; }
@@ -151,8 +167,8 @@ body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #f0f0f0; 
 }
 
 #conversation-list {
-  flex: 1;
   overflow-y: auto;
+  max-height: calc(100vh - 140px);
 }
 
 .conversation-item {
@@ -263,4 +279,77 @@ body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #f0f0f0; 
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.menu-wrapper {
+  position: relative;
+}
+
+.menu-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.dropdown {
+  position: absolute;
+  right: 0;
+  top: 20px;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 6px;
+  min-width: 120px;
+  z-index: 10;
+}
+
+.dropdown-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.dropdown-item:hover {
+  background: #333;
+}
+
+.dropdown-item.delete {
+  color: #ff6b6b;
+}
+
+.hidden {
+  display: none;
+}
+
+.conversation-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.conversation-item:hover {
+  background: #2a2a2a;
+}
+
+.conversation-item.active {
+  background: #3a3a3a;
+}
+
+textarea {
+  resize: none;
+  overflow: hidden;
+}
+
+.typing {
+  font-style: italic;
+  opacity: 0.7;
+  animation: blink 1.2s infinite;
+}
+
+@keyframes blink {
+  0% { opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { opacity: 0.2; }
 }

@@ -119,4 +119,30 @@ router.patch('/:id/pin', requireAuth, (req, res, next) => {
   }
 })
 
+// ✅ RENAME conversation (separate route)
+router.patch('/:id', requireAuth, (req, res, next) => {
+  try {
+    const { id } = req.params
+    const { title } = req.body
+
+    if (!title) {
+      return res.status(400).json({ error: 'Title required' })
+    }
+
+    const result = db.prepare(`
+      UPDATE conversations
+      SET title = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ?
+    `).run(title, id, req.user.id)
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Conversation not found' })
+    }
+
+    res.json({ success: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
 export default router

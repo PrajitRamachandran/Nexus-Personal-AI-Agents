@@ -101,6 +101,13 @@ export const api = {
       method: 'PATCH'
     }),
 
+  renameConversation: (id, title) =>
+    request(`/api/conversations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title })
+    }),
+
+
   // ===== CHAT (STREAMING) =====
   async chatStream({ conversation_id, message, onToken, onDone, onError }) {
     const token = auth.getToken()

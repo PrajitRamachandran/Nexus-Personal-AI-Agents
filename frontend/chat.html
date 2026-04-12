@@ -45,285 +45,287 @@
 
   <script type="module">
     import { api } from './api.js'
-    import { auth } from './auth.js'
+import { auth } from './auth.js'
 
-    if (!auth.isLoggedIn()) window.location.href = './login.html'
+if (!auth.isLoggedIn()) window.location.href = './login.html'
 
-    const messagesEl = document.getElementById('messages')
-    const inputEl = document.getElementById('input')
-    const sendBtn = document.getElementById('send-btn')
-    const emptyHint = document.getElementById('empty-hint')
-    const statsBar = document.getElementById('stats-bar')
-    const usernameEl = document.getElementById('username-display')
-    const logoutBtn = document.getElementById('logout-btn')
-    const convoList = document.getElementById('conversation-list')
-    const newChatBtn = document.getElementById('new-chat-btn')
+const messagesEl = document.getElementById('messages')
+const inputEl = document.getElementById('input')
+const sendBtn = document.getElementById('send-btn')
+const emptyHint = document.getElementById('empty-hint')
+const statsBar = document.getElementById('stats-bar')
+const usernameEl = document.getElementById('username-display')
+const logoutBtn = document.getElementById('logout-btn')
+const convoList = document.getElementById('conversation-list')
+const newChatBtn = document.getElementById('new-chat-btn')
 
-    let currentConversationId = null
+let currentConversationId = null
 
-    usernameEl.textContent = auth.getUsername()
+usernameEl.textContent = auth.getUsername()
 
-    logoutBtn.addEventListener('click', () => {
-      auth.logout()
-      window.location.href = './login.html'
-    })
+logoutBtn.addEventListener('click', () => {
+  auth.logout()
+  window.location.href = './login.html'
+})
 
-    sendBtn.addEventListener('click', () => {
-      void sendMessage()
-    })
+sendBtn.addEventListener('click', () => void sendMessage())
+newChatBtn.addEventListener('click', () => void createNewConversation())
 
-    newChatBtn.addEventListener('click', () => {
-      void createNewConversation()
-    })
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    void sendMessage()
+  }
+})
+inputEl.addEventListener('input', () => {
+  inputEl.style.height = 'auto'
+  inputEl.style.height = inputEl.scrollHeight + 'px'
+})
 
-    inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
-        void sendMessage()
+document.addEventListener('click', () => {
+  document.querySelectorAll('.dropdown').forEach(d => d.classList.add('hidden'))
+})
+
+function createBubble(role) {
+  const div = document.createElement('div')
+  div.className = `message ${role}`
+
+  const label = document.createElement('span')
+  label.className = 'role-label'
+  label.textContent = role === 'user' ? 'You' : 'AI'
+
+  const p = document.createElement('p')
+
+  div.append(label, p)
+  messagesEl.appendChild(div)
+  return div
+}
+
+function appendMessage(role, content) {
+  const div = createBubble(role)
+  div.querySelector('p').textContent = content
+
+  messagesEl.appendChild(div)
+
+  messagesEl.scrollTop = messagesEl.scrollHeight
+}
+
+function clearMessages() {
+  messagesEl.innerHTML = ''
+}
+
+function showEmptyState() {
+  emptyHint.style.display = 'block'
+}
+
+function hideEmptyState() {
+  emptyHint.style.display = 'none'
+}
+
+function showStats(meta) {
+  statsBar.classList.remove('hidden')
+  statsBar.innerHTML = `
+    <span>Model: <strong>${meta.model ?? '-'}</strong></span>
+    <span>Prompt: <strong>${meta.prompt_tokens ?? '-'}</strong></span>
+    <span>Response: <strong>${meta.response_tokens ?? '-'}</strong></span>
+    <span>Total: <strong>${meta.total_tokens ?? '-'}</strong></span>
+    <span>Time: <strong>${meta.duration_ms ?? '-'} ms</strong></span>
+  `
+}
+
+function setLoading(on) {
+  sendBtn.disabled = on
+  sendBtn.textContent = on ? 'Sending...' : 'Send'
+}
+
+async function loadConversations() {
+  const convos = await api.conversations()
+  convoList.innerHTML = ''
+
+  convos.forEach(c => {
+    const item = document.createElement('div')
+    item.className = 'conversation-item'
+
+    // ACTIVE HIGHLIGHT
+    if (c.id === currentConversationId) {
+      item.classList.add('active')
+    }
+
+    item.onclick = () => loadConversation(c.id)
+
+    const title = document.createElement('span')
+    title.textContent = c.title
+
+const menuWrapper = document.createElement('div')
+menuWrapper.className = 'menu-wrapper'
+
+// 3 DOT BUTTON
+const menuBtn = document.createElement('button')
+menuBtn.className = 'menu-btn'
+menuBtn.textContent = '⋮'
+
+// DROPDOWN
+const dropdown = document.createElement('div')
+dropdown.className = 'dropdown hidden'
+
+// PIN
+const pinBtn = document.createElement('div')
+pinBtn.className = 'dropdown-item'
+pinBtn.textContent = 'Pin'
+pinBtn.onclick = async (e) => {
+  e.stopPropagation()
+  await api.togglePin(c.id)
+  await loadConversations()
+}
+
+// RENAME
+const renameBtn = document.createElement('div')
+renameBtn.className = 'dropdown-item'
+renameBtn.textContent = 'Rename'
+renameBtn.onclick = async (e) => {
+  e.stopPropagation()
+
+  const newTitle = prompt('Enter new name:')
+  if (!newTitle) return
+
+  await api.renameConversation(c.id, newTitle)
+  await loadConversations()
+
+  if (c.id === currentConversationId) {
+    await loadConversation(c.id)
+  }
+}
+
+// DELETE
+const deleteBtn = document.createElement('div')
+deleteBtn.className = 'dropdown-item delete'
+deleteBtn.textContent = 'Delete'
+deleteBtn.onclick = async (e) => {
+  e.stopPropagation()
+  await deleteConversation(c.id)
+}
+
+// TOGGLE DROPDOWN
+menuBtn.onclick = (e) => {
+  e.stopPropagation()
+
+  document.querySelectorAll('.dropdown').forEach(d => {
+    if (d !== dropdown) d.classList.add('hidden')
+  })
+
+  dropdown.classList.toggle('hidden')
+}
+
+dropdown.append(pinBtn, renameBtn, deleteBtn)
+menuWrapper.append(menuBtn, dropdown)
+item.append(title, menuWrapper)
+
+    convoList.appendChild(item)
+  })
+
+  return convos
+}
+
+async function loadConversation(id) {
+  const data = await api.getConversation(id)
+  currentConversationId = id
+
+  clearMessages()
+  statsBar.classList.add('hidden')
+
+  if (!data.messages.length) {
+    showEmptyState()
+  } else {
+    hideEmptyState()
+    data.messages.forEach(m => appendMessage(m.role, m.content))
+  }
+
+  await loadConversations()
+}
+
+async function createNewConversation() {
+  const convo = await api.createConversation('New Chat')
+  currentConversationId = convo.id
+  clearMessages()
+  showEmptyState()
+  await loadConversations()
+}
+
+async function deleteConversation(id) {
+  await api.deleteConversation(id)
+
+  if (currentConversationId === id) {
+    currentConversationId = null
+    clearMessages()
+    showEmptyState()
+  }
+
+  const convos = await loadConversations()
+  if (convos.length > 0 && !currentConversationId) {
+    await loadConversation(convos[0].id)
+  }
+}
+
+async function sendMessage() {
+  const text = inputEl.value.trim()
+  if (!text || sendBtn.disabled) return
+
+  if (!currentConversationId) {
+    const convo = await api.createConversation('New Chat')
+    currentConversationId = convo.id
+    await loadConversations()
+  }
+
+  hideEmptyState()
+  inputEl.value = ''
+  setLoading(true)
+  inputEl.disabled = true
+  inputEl.focus()
+
+  appendMessage('user', text)
+
+  const bubble = createBubble('assistant')
+  const contentEl = bubble.querySelector('p')
+  contentEl.innerHTML = `<span class="typing">AI is typing...</span>`
+  let fullReply = ''
+
+  try {
+    await api.chatStream({
+      conversation_id: currentConversationId,
+      message: text,
+      onToken(token) {
+  fullReply += token
+  contentEl.textContent = fullReply
+
+  messagesEl.scrollTop = messagesEl.scrollHeight
+},
+      onDone(meta) {
+        showStats(meta)
+      },
+      onError(err) {
+        contentEl.textContent = err
       }
     })
 
-    document.addEventListener('click', () => {
-      document.querySelectorAll('.dropdown').forEach((dropdown) => {
-        dropdown.classList.add('hidden')
-      })
-    })
+    await loadConversations()
+  } catch (err) {
+    contentEl.textContent = err.message
+  } finally {
+    setLoading(false)
+  }
+}
 
-    function conversationTitle(text) {
-      const normalized = (text || '').replace(/\s+/g, ' ').trim()
-      if (!normalized) return 'New Chat'
-      return normalized.length > 48 ? `${normalized.slice(0, 48)}...` : normalized
-    }
+async function init() {
+  const convos = await loadConversations()
 
-    function createBubble(role) {
-      const div = document.createElement('div')
-      div.className = `message ${role}`
+  if (convos.length > 0) {
+    await loadConversation(convos[0].id)
+  } else {
+    showEmptyState()
+  }
+}
 
-      const label = document.createElement('span')
-      label.className = 'role-label'
-      label.textContent = role === 'user' ? 'You' : 'AI'
-
-      const p = document.createElement('p')
-
-      div.appendChild(label)
-      div.appendChild(p)
-      messagesEl.appendChild(div)
-      return div
-    }
-
-    function appendMessage(role, content) {
-      const div = createBubble(role)
-      div.querySelector('p').textContent = content
-      div.scrollIntoView({ behavior: 'smooth', block: 'end' })
-    }
-
-    function clearMessages() {
-      messagesEl.innerHTML = ''
-    }
-
-    function showEmptyState() {
-      emptyHint.style.display = 'block'
-    }
-
-    function hideEmptyState() {
-      emptyHint.style.display = 'none'
-    }
-
-    function showStats(meta) {
-      statsBar.classList.remove('hidden')
-      statsBar.innerHTML = `
-        <span>Model: <strong>${meta.model ?? '-'}</strong></span>
-        <span>Prompt tokens: <strong>${meta.prompt_tokens ?? '-'}</strong></span>
-        <span>Response tokens: <strong>${meta.response_tokens ?? '-'}</strong></span>
-        <span>Total tokens: <strong>${meta.total_tokens ?? '-'}</strong></span>
-        <span>Duration: <strong>${meta.duration_ms ? `${meta.duration_ms} ms` : '-'}</strong></span>
-      `
-    }
-
-    function setLoading(on) {
-      sendBtn.disabled = on
-      sendBtn.textContent = on ? '...' : 'Send'
-    }
-
-    async function loadConversations(selectedId = currentConversationId) {
-      const conversations = await api.conversations()
-      convoList.innerHTML = ''
-
-      conversations.forEach((conversation) => {
-        const item = document.createElement('div')
-        item.className = `conversation-item${conversation.id === selectedId ? ' active' : ''}`
-
-        const title = document.createElement('span')
-        title.textContent = conversation.title || 'Untitled'
-
-        const menuBtn = document.createElement('button')
-        menuBtn.type = 'button'
-        menuBtn.textContent = '...'
-        menuBtn.className = 'menu-btn'
-
-        const menu = document.createElement('div')
-        menu.className = 'dropdown hidden'
-
-        const pin = document.createElement('div')
-        pin.textContent = conversation.pinned ? 'Unpin' : 'Pin'
-        pin.addEventListener('click', async (e) => {
-          e.stopPropagation()
-          await api.togglePin(conversation.id)
-          await loadConversations(selectedId)
-        })
-
-        const del = document.createElement('div')
-        del.textContent = 'Delete'
-        del.addEventListener('click', async (e) => {
-          e.stopPropagation()
-          await deleteConversation(conversation.id)
-        })
-
-        menu.appendChild(pin)
-        menu.appendChild(del)
-
-        menuBtn.addEventListener('click', (e) => {
-          e.stopPropagation()
-          document.querySelectorAll('.dropdown').forEach((dropdown) => {
-            if (dropdown !== menu) dropdown.classList.add('hidden')
-          })
-          menu.classList.toggle('hidden')
-        })
-
-        item.addEventListener('click', () => {
-          void loadConversation(conversation.id)
-        })
-
-        item.appendChild(title)
-        item.appendChild(menuBtn)
-        item.appendChild(menu)
-        convoList.appendChild(item)
-      })
-
-      return conversations
-    }
-
-    async function loadConversation(id) {
-      const data = await api.getConversation(id)
-      currentConversationId = data.id
-
-      clearMessages()
-      statsBar.classList.add('hidden')
-
-      if (!data.messages.length) {
-        showEmptyState()
-      } else {
-        hideEmptyState()
-        data.messages.forEach((message) => {
-          appendMessage(message.role, message.content)
-        })
-      }
-
-      await loadConversations(currentConversationId)
-    }
-
-    async function createNewConversation() {
-      const conversation = await api.createConversation('New Chat')
-      currentConversationId = conversation.id
-      clearMessages()
-      statsBar.classList.add('hidden')
-      showEmptyState()
-      await loadConversations(currentConversationId)
-      inputEl.focus()
-    }
-
-    async function deleteConversation(id) {
-      await api.deleteConversation(id)
-
-      if (currentConversationId !== id) {
-        await loadConversations(currentConversationId)
-        return
-      }
-
-      currentConversationId = null
-      clearMessages()
-      statsBar.classList.add('hidden')
-
-      const conversations = await loadConversations()
-      if (conversations.length > 0) {
-        await loadConversation(conversations[0].id)
-      } else {
-        showEmptyState()
-      }
-    }
-
-    async function sendMessage() {
-      const text = inputEl.value.trim()
-      if (!text || sendBtn.disabled) return
-
-      if (!currentConversationId) {
-        const conversation = await api.createConversation(conversationTitle(text))
-        currentConversationId = conversation.id
-        await loadConversations(currentConversationId)
-      }
-
-      hideEmptyState()
-      statsBar.classList.add('hidden')
-      inputEl.value = ''
-      setLoading(true)
-
-      appendMessage('user', text)
-
-      const assistantBubble = createBubble('assistant')
-      const contentEl = assistantBubble.querySelector('p')
-      let fullReply = ''
-
-      try {
-        await api.chatStream({
-          conversation_id: currentConversationId,
-          message: text,
-          onToken(token) {
-            fullReply += token
-            contentEl.textContent = fullReply
-            assistantBubble.scrollIntoView({ behavior: 'smooth', block: 'end' })
-          },
-          onDone(meta) {
-            showStats(meta)
-          },
-          onError(errMsg) {
-            contentEl.textContent = `Error: ${errMsg}`
-            contentEl.style.color = '#ff6b6b'
-          },
-        })
-
-        if (!fullReply && !contentEl.textContent) {
-          contentEl.textContent = '(No response)'
-        }
-
-        await loadConversations(currentConversationId)
-      } catch (err) {
-        contentEl.textContent = `Error: ${err.message}`
-        contentEl.style.color = '#ff6b6b'
-      } finally {
-        setLoading(false)
-        inputEl.focus()
-      }
-    }
-
-    async function init() {
-      try {
-        const conversations = await loadConversations()
-        if (conversations.length > 0) {
-          await loadConversation(conversations[0].id)
-        } else {
-          clearMessages()
-          showEmptyState()
-        }
-      } catch (err) {
-        clearMessages()
-        const errorBubble = createBubble('assistant')
-        const contentEl = errorBubble.querySelector('p')
-        contentEl.textContent = `Failed to load chats: ${err.message}`
-        contentEl.style.color = '#ff6b6b'
-      }
-    }
-
-    void init()
+init()
   </script>
 </body>
 </html>

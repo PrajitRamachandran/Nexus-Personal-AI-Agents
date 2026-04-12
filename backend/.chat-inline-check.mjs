@@ -100,63 +100,62 @@
       sendBtn.textContent = on ? '...' : 'Send'
     }
 
-    async function loadConversations(selectedId = currentConversationId) {
-      const conversations = await api.conversations()
-      convoList.innerHTML = ''
+    async function loadConversations() {
+  const convos = await api.conversations()
 
-      conversations.forEach((conversation) => {
-        const item = document.createElement('div')
-        item.className = `conversation-item${conversation.id === selectedId ? ' active' : ''}`
+  sidebar.innerHTML = ''
 
-        const title = document.createElement('span')
-        title.textContent = conversation.title || 'Untitled'
+  convos.forEach(c => {
 
-        const menuBtn = document.createElement('button')
-        menuBtn.type = 'button'
-        menuBtn.textContent = '...'
-        menuBtn.className = 'menu-btn'
+    const item = document.createElement('div')
+    item.className = 'conversation-item'
 
-        const menu = document.createElement('div')
-        menu.className = 'dropdown hidden'
+    const title = document.createElement('span')
+    title.textContent = c.title
 
-        const pin = document.createElement('div')
-        pin.textContent = conversation.pinned ? 'Unpin' : 'Pin'
-        pin.addEventListener('click', async (e) => {
-          e.stopPropagation()
-          await api.togglePin(conversation.id)
-          await loadConversations(selectedId)
-        })
+    const menu = document.createElement('div')
 
-        const del = document.createElement('div')
-        del.textContent = 'Delete'
-        del.addEventListener('click', async (e) => {
-          e.stopPropagation()
-          await deleteConversation(conversation.id)
-        })
-
-        menu.appendChild(pin)
-        menu.appendChild(del)
-
-        menuBtn.addEventListener('click', (e) => {
-          e.stopPropagation()
-          document.querySelectorAll('.dropdown').forEach((dropdown) => {
-            if (dropdown !== menu) dropdown.classList.add('hidden')
-          })
-          menu.classList.toggle('hidden')
-        })
-
-        item.addEventListener('click', () => {
-          void loadConversation(conversation.id)
-        })
-
-        item.appendChild(title)
-        item.appendChild(menuBtn)
-        item.appendChild(menu)
-        convoList.appendChild(item)
-      })
-
-      return conversations
+    // PIN
+    const pinBtn = document.createElement('button')
+    pinBtn.className = 'menu-btn'
+    pinBtn.textContent = 'Pin'
+    pinBtn.onclick = async () => {
+      await api.togglePin(c.id)
+      await loadConversations()
     }
+
+    // DELETE
+    const deleteBtn = document.createElement('button')
+    deleteBtn.className = 'menu-btn'
+    deleteBtn.textContent = 'Delete'
+    deleteBtn.onclick = async () => {
+      await api.deleteConversation(c.id)
+      await loadConversations()
+    }
+
+    // ✅ RENAME (FIXED SCOPE)
+    const renameBtn = document.createElement('button')
+    renameBtn.className = 'menu-btn'
+    renameBtn.textContent = 'Rename'
+
+    renameBtn.onclick = async () => {
+      const newTitle = prompt('Enter new chat name:')
+      if (!newTitle) return
+
+      await api.renameConversation(c.id, newTitle)
+      await loadConversations()
+
+      if (c.id === currentConversationId) {
+        await loadConversation(c.id)
+      }
+    }
+
+    menu.append(pinBtn, renameBtn, deleteBtn)
+    item.append(title, menu)
+
+    sidebar.appendChild(item)
+  })
+}
 
     async function loadConversation(id) {
       const data = await api.getConversation(id)
