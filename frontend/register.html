@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Register</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="auth-page">
+  <div class="auth-card">
+    <h1>Create account</h1>
+    <p id="error" class="error hidden"></p>
+    <input id="username" type="text" placeholder="Username" />
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password (min 8 chars)" />
+    <button id="submit-btn">Create account</button>
+    <p class="switch-link">Have an account? <a href="./login.html">Sign in</a></p>
+  </div>
+
+  <script type="module">
+    import { api } from './api.js'
+    import { auth } from './auth.js'
+
+    if (auth.isLoggedIn()) window.location.href = './chat.html'
+
+    const errorEl = document.getElementById('error')
+    const btn = document.getElementById('submit-btn')
+
+    btn.addEventListener('click', async () => {
+      const username = document.getElementById('username').value.trim()
+      const email    = document.getElementById('email').value.trim()
+      const password = document.getElementById('password').value
+
+      if (!username || !email || !password) return showError('All fields required')
+
+      btn.disabled = true
+      btn.textContent = 'Creating…'
+      errorEl.classList.add('hidden')
+
+      try {
+        const data = await api.register({ username, email, password })
+        auth.login(data.token, data.username)
+        window.location.href = './chat.html'
+      } catch (err) {
+        showError(err.message)
+        btn.disabled = false
+        btn.textContent = 'Create account'
+      }
+    })
+
+    function showError(msg) {
+      errorEl.textContent = msg
+      errorEl.classList.remove('hidden')
+    }
+  </script>
+</body>
+</html>

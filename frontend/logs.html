@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat Logs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="logs-page">
+
+  <header class="chat-header">
+    <span class="header-title">Chat Logs</span>
+    <span class="header-user">
+      <a href="./chat.html" style="color:#6c63ff;text-decoration:none;font-size:14px">← Back to chat</a>
+      &nbsp;·&nbsp;
+      <button id="logout-btn">Sign out</button>
+    </span>
+  </header>
+
+  <div class="logs-container">
+    <div id="logs-list"><p class="empty-hint">Loading…</p></div>
+  </div>
+
+  <script type="module">
+    import { api } from './api.js'
+    import { auth } from './auth.js'
+
+    if (!auth.isLoggedIn()) window.location.href = './login.html'
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      auth.logout(); window.location.href = './login.html'
+    })
+
+    const listEl = document.getElementById('logs-list')
+
+    try {
+      const logs = await api.logs()
+
+      if (logs.length === 0) {
+        listEl.innerHTML = '<p class="empty-hint">No logs yet.</p>'
+      } else {
+        listEl.innerHTML = logs.map(log => `
+          <div class="log-card">
+            <div class="log-meta">
+              <span class="log-user">${log.username}</span>
+              <span class="log-time">${new Date(log.created_at).toLocaleString()}</span>
+              <span class="log-model">${log.model ?? '—'}</span>
+            </div>
+            <div class="log-stats">
+              <span>Prompt tokens: <strong>${log.prompt_tokens ?? '—'}</strong></span>
+              <span>Response tokens: <strong>${log.response_tokens ?? '—'}</strong></span>
+              <span>Total tokens: <strong>${log.total_tokens ?? '—'}</strong></span>
+              <span>Duration: <strong>${log.duration_ms ? log.duration_ms + ' ms' : '—'}</strong></span>
+              <span>Messages in context: <strong>${log.message_count ?? '—'}</strong></span>
+            </div>
+            <div class="log-messages">
+              <div class="log-prompt"><span class="role-label">User</span><p>${escapeHtml(log.user_message ?? '')}</p></div>
+              <div class="log-reply"><span class="role-label">AI</span><p>${escapeHtml((log.assistant_reply ?? '').slice(0, 300))}${(log.assistant_reply?.length ?? 0) > 300 ? '…' : ''}</p></div>
+            </div>
+          </div>
+        `).join('')
+      }
+    } catch (err) {
+      listEl.innerHTML = `<p class="error">Failed to load logs: ${err.message}</p>`
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    }
+  </script>
+</body>
+</html>
