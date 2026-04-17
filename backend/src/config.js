@@ -15,9 +15,10 @@ function resolveBackendPath(filePath) {
 export const config = {
   port: process.env.PORT || 3001,
   jwtSecret: process.env.JWT_SECRET,
-  ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:11434',
+  ollamaHost: 'http://localhost:11434',
   ollamaModel: process.env.OLLAMA_MODEL || 'llama3',
   dbPath: resolveBackendPath(process.env.DB_PATH || './data/platform.db'),
+  adminUsername: process.env.ADMIN_USERNAME || '',
 }
 
 if (!config.jwtSecret) {

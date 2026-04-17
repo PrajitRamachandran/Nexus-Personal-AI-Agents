@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Nexus AI — Your intelligent AI workspace with persistent memory">
   <title>Nexus AI</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -32,8 +34,40 @@
           <span id="username-display"><span class="avatar-sm"></span>User</span>
           <button id="logout-btn">Sign out</button>
         </div>
-        <div class="app-version">Nexus AI v1.0.0</div>
+
+        <!-- Memory Panel Toggle -->
+        <button id="memory-toggle-btn" class="memory-toggle-btn" title="View long-term memory">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+          </svg>
+          Memory
+          <span id="memory-count-badge" class="memory-count-badge hidden">0</span>
+        </button>
+
+        <div class="app-version">Nexus AI v1.1.0</div>
       </div>
+    </div>
+
+    <!-- Memory Panel (slide-in over sidebar content area) -->
+    <div id="memory-panel" class="memory-panel hidden">
+      <div class="memory-panel-header">
+        <div class="memory-panel-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+          </svg>
+          Long-term Memory
+        </div>
+        <button id="memory-close-btn" class="memory-close-btn" title="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="memory-panel-desc">
+        Facts Nexus remembers about you across all conversations.
+      </div>
+      <div id="memory-list" class="memory-list"></div>
     </div>
 
     <div class="main">
@@ -70,20 +104,25 @@
 
     if (!auth.isLoggedIn()) window.location.href = './login.html'
 
-    const messagesEl = document.getElementById('messages')
-    const inputEl = document.getElementById('input')
-    const sendBtn = document.getElementById('send-btn')
-    const emptyHint = document.getElementById('empty-hint')
-    const statsBar = document.getElementById('stats-bar')
-    const usernameEl = document.getElementById('username-display')
-    const logoutBtn = document.getElementById('logout-btn')
-    const convoList = document.getElementById('conversation-list')
-    const newChatBtn = document.getElementById('new-chat-btn')
+    const messagesEl      = document.getElementById('messages')
+    const inputEl         = document.getElementById('input')
+    const sendBtn         = document.getElementById('send-btn')
+    const emptyHint       = document.getElementById('empty-hint')
+    const statsBar        = document.getElementById('stats-bar')
+    const usernameEl      = document.getElementById('username-display')
+    const logoutBtn       = document.getElementById('logout-btn')
+    const convoList       = document.getElementById('conversation-list')
+    const newChatBtn      = document.getElementById('new-chat-btn')
     const currentChatTitle = document.getElementById('current-chat-title')
+    const memoryToggleBtn = document.getElementById('memory-toggle-btn')
+    const memoryPanel     = document.getElementById('memory-panel')
+    const memoryCloseBtn  = document.getElementById('memory-close-btn')
+    const memoryList      = document.getElementById('memory-list')
+    const memoryCountBadge = document.getElementById('memory-count-badge')
 
     let currentConversationId = null
 
-    // Inject Username into nice UI
+    // ─── Username ────────────────────────────────────────────────────────────
     usernameEl.innerHTML = `<span class="avatar-sm"></span> ${auth.getUsername()}`
 
     logoutBtn.addEventListener('click', () => {
@@ -91,6 +130,7 @@
       window.location.href = './login.html'
     })
 
+    // ─── Input handlers ──────────────────────────────────────────────────────
     sendBtn.addEventListener('click', () => void sendMessage())
     newChatBtn.addEventListener('click', () => void createNewConversation())
 
@@ -109,7 +149,164 @@
       document.querySelectorAll('.dropdown').forEach(d => d.classList.add('hidden'))
     })
 
-    // DOM Generation completely upgraded for ChatGPT style
+    // ─── Memory Panel ─────────────────────────────────────────────────────────
+    memoryToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const isHidden = memoryPanel.classList.contains('hidden')
+      if (isHidden) {
+        memoryPanel.classList.remove('hidden')
+        requestAnimationFrame(() => memoryPanel.classList.add('open'))
+        loadMemoryPanel()
+      } else {
+        closeMemoryPanel()
+      }
+    })
+
+    memoryCloseBtn.addEventListener('click', closeMemoryPanel)
+
+    function closeMemoryPanel() {
+      memoryPanel.classList.remove('open')
+      setTimeout(() => memoryPanel.classList.add('hidden'), 250)
+    }
+
+    async function loadMemoryPanel() {
+      memoryList.innerHTML = `<div class="memory-loading">Loading memories…</div>`
+      try {
+        const { memories } = await api.getMemory()
+        renderMemoryList(memories)
+      } catch {
+        memoryList.innerHTML = `<div class="memory-empty">Failed to load memories.</div>`
+      }
+    }
+
+    function renderMemoryList(memories) {
+      // Update count badge
+      if (memories.length > 0) {
+        memoryCountBadge.textContent = memories.length
+        memoryCountBadge.classList.remove('hidden')
+      } else {
+        memoryCountBadge.classList.add('hidden')
+      }
+
+      if (memories.length === 0) {
+        memoryList.innerHTML = `
+          <div class="memory-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4; margin-bottom:8px">
+              <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+            </svg>
+            <p>No memories yet.</p>
+            <p style="font-size:12px; margin-top:4px;">Share personal info or preferences and Nexus will remember them.</p>
+          </div>`
+        return
+      }
+
+      memoryList.innerHTML = ''
+      memories.forEach(m => {
+        const item = document.createElement('div')
+        item.className = 'memory-item'
+        item.dataset.id = m.id
+
+        const categoryColors = {
+          preference: '#6366f1',
+          habit:      '#f59e0b',
+          personal:   '#10b981',
+          goal:       '#ec4899',
+          skill:      '#3b82f6',
+        }
+        const color = categoryColors[m.category] ?? '#6b6b75'
+        const lastUsed = m.last_used
+          ? new Date(m.last_used).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : 'Never used'
+
+        item.innerHTML = `
+          <div class="memory-item-header">
+            <span class="memory-badge" style="background: ${color}20; color: ${color}; border: 1px solid ${color}40">${m.category}</span>
+            <span class="memory-date">${lastUsed}</span>
+          </div>
+          <p class="memory-content">${escapeHtml(m.content)}</p>
+          ${m.context ? `<p class="memory-context">${escapeHtml(m.context)}</p>` : ''}
+          <button class="memory-delete-btn" data-id="${m.id}" title="Delete this memory">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6l-1 14H6L5 6"></path>
+              <path d="M10 11v6M14 11v6"></path>
+              <path d="M9 6V4h6v2"></path>
+            </svg>
+            Delete
+          </button>
+        `
+        memoryList.appendChild(item)
+      })
+
+      // Delete handlers
+      memoryList.querySelectorAll('.memory-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation()
+          const id = Number(btn.dataset.id)
+          const item = memoryList.querySelector(`.memory-item[data-id="${id}"]`)
+          if (!item) return
+          item.style.opacity = '0.4'
+          try {
+            await api.deleteMemory(id)
+            item.classList.add('memory-item-removing')
+            setTimeout(() => item.remove(), 250)
+            // Re-count
+            const remaining = memoryList.querySelectorAll('.memory-item').length - 1
+            if (remaining <= 0) {
+              renderMemoryList([])
+            } else {
+              memoryCountBadge.textContent = remaining
+            }
+          } catch {
+            item.style.opacity = '1'
+          }
+        })
+      })
+    }
+
+    function escapeHtml(str) {
+      return (str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    }
+
+    // ─── Update memory badge count (background, no panel open) ───────────────
+    async function refreshMemoryCount() {
+      try {
+        const { memories } = await api.getMemory()
+        if (memories.length > 0) {
+          memoryCountBadge.textContent = memories.length
+          memoryCountBadge.classList.remove('hidden')
+        } else {
+          memoryCountBadge.classList.add('hidden')
+        }
+      } catch {}
+    }
+
+    // ─── Real-time title update (from SSE done event) ─────────────────────────
+    function applyTitleUpdate({ id, title }) {
+      if (!title) return
+
+      // Update header if this is the current conversation
+      if (id === currentConversationId) {
+        currentChatTitle.textContent = title
+        currentChatTitle.classList.add('title-animating')
+        setTimeout(() => currentChatTitle.classList.remove('title-animating'), 600)
+      }
+
+      // Update sidebar item in-place (no full reload needed)
+      const items = convoList.querySelectorAll('.conversation-item')
+      items.forEach(item => {
+        if (item.dataset.convoId === String(id)) {
+          const titleSpan = item.querySelector('.chat-title-wrapper span:last-child')
+          if (titleSpan) {
+            titleSpan.textContent = title
+            titleSpan.classList.add('title-animating')
+            setTimeout(() => titleSpan.classList.remove('title-animating'), 600)
+          }
+        }
+      })
+    }
+
+    // ─── Message rendering ────────────────────────────────────────────────────
     function createBubble(role) {
       const div = document.createElement('div')
       div.className = `message ${role}`
@@ -126,7 +323,6 @@
       label.textContent = role === 'user' ? 'You' : 'Nexus AI'
 
       const p = document.createElement('p')
-
       content.append(label, p)
       div.append(avatar, content)
       messagesEl.appendChild(div)
@@ -140,14 +336,13 @@
     }
 
     function clearMessages() {
-      // Retain the empty hint element
       messagesEl.innerHTML = ''
       messagesEl.appendChild(emptyHint)
     }
 
     function showEmptyState() {
       emptyHint.style.display = 'block'
-      currentChatTitle.textContent = "New Conversation"
+      currentChatTitle.textContent = 'New Conversation'
     }
 
     function hideEmptyState() {
@@ -169,9 +364,11 @@
       inputEl.style.opacity = on ? '0.6' : '1'
     }
 
+    // ─── Conversation list rendering ──────────────────────────────────────────
     function renderConvoItem(c) {
       const item = document.createElement('div')
       item.className = 'conversation-item'
+      item.dataset.convoId = c.id
       if (c.id === currentConversationId) {
         item.classList.add('active')
         currentChatTitle.textContent = c.title
@@ -181,8 +378,7 @@
 
       const wrapper = document.createElement('div')
       wrapper.className = 'chat-title-wrapper'
-      
-      // Icon depending on pin status
+
       const icon = document.createElement('span')
       icon.innerHTML = c.pinned ? '📌' : '💬'
       icon.style.opacity = '0.7'
@@ -190,7 +386,7 @@
 
       const title = document.createElement('span')
       title.textContent = c.title
-      
+
       wrapper.append(icon, title)
 
       const menuWrapper = document.createElement('div')
@@ -231,7 +427,7 @@
       deleteBtn.textContent = 'Delete'
       deleteBtn.onclick = async (e) => {
         e.stopPropagation()
-        if(confirm('Delete this conversation?')) {
+        if (confirm('Delete this conversation?')) {
           await deleteConversation(c.id)
         }
       }
@@ -254,22 +450,21 @@
       const convos = await api.conversations()
       convoList.innerHTML = ''
 
-      // Logic to separate pinned vs unpinned
-      const pinned = convos.filter(c => c.pinned)
+      const pinned   = convos.filter(c => c.pinned)
       const unpinned = convos.filter(c => !c.pinned)
 
-      if(pinned.length > 0) {
-        const lbl = document.createElement('div');
-        lbl.className = 'sidebar-label'; lbl.textContent = 'Pinned';
-        convoList.appendChild(lbl);
-        pinned.forEach(c => renderConvoItem(c));
+      if (pinned.length > 0) {
+        const lbl = document.createElement('div')
+        lbl.className = 'sidebar-label'; lbl.textContent = 'Pinned'
+        convoList.appendChild(lbl)
+        pinned.forEach(c => renderConvoItem(c))
       }
 
-      if(unpinned.length > 0) {
-        const lbl = document.createElement('div');
-        lbl.className = 'sidebar-label'; lbl.textContent = 'Recent';
-        convoList.appendChild(lbl);
-        unpinned.forEach(c => renderConvoItem(c));
+      if (unpinned.length > 0) {
+        const lbl = document.createElement('div')
+        lbl.className = 'sidebar-label'; lbl.textContent = 'Recent'
+        convoList.appendChild(lbl)
+        unpinned.forEach(c => renderConvoItem(c))
       }
 
       return convos
@@ -315,6 +510,7 @@
       }
     }
 
+    // ─── Send message ─────────────────────────────────────────────────────────
     async function sendMessage() {
       const text = inputEl.value.trim()
       if (!text || sendBtn.disabled) return
@@ -327,7 +523,7 @@
 
       hideEmptyState()
       inputEl.value = ''
-      inputEl.style.height = 'auto' // Reset height
+      inputEl.style.height = 'auto'
       setLoading(true)
       inputEl.disabled = true
       inputEl.focus()
@@ -350,13 +546,30 @@
           },
           onDone(meta) {
             showStats(meta)
+            // Load conversations immediately when chat response is done
+            // (don't wait for the stream to fully close — title/memory run after)
+            loadConversations().catch(() => {})
+            refreshMemoryCount()
+          },
+          onTitleUpdate(update) {
+            // Real-time title push — arrives a few seconds after onDone
+            applyTitleUpdate(update)
+          },
+          onMemoryUpdate() {
+            refreshMemoryCount()
+            if (!memoryPanel.classList.contains('hidden')) {
+              loadMemoryPanel()
+            }
           },
           onError(err) {
             contentEl.textContent = err
           }
         })
 
-        await loadConversations()
+        refreshMemoryCount()
+
+        // Stream is now fully closed (title + memory done server-side)
+        // loadConversations already called in onDone above — no need to repeat
       } catch (err) {
         contentEl.textContent = err.message
       } finally {
@@ -366,6 +579,7 @@
       }
     }
 
+    // ─── Init ─────────────────────────────────────────────────────────────────
     async function init() {
       const convos = await loadConversations()
 
@@ -374,6 +588,9 @@
       } else {
         showEmptyState()
       }
+
+      // Load initial memory badge count
+      refreshMemoryCount()
     }
 
     init()

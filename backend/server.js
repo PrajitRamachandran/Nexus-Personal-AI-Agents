@@ -7,12 +7,14 @@ import authRoutes from './src/routes/auth.js'
 import chatRoutes from './src/routes/chat.js'
 import logsRoutes from './src/routes/logs.js'
 import conversationRoutes from './src/routes/conversations.js'
+import memoryRoutes from './src/routes/memory.js'
 import { fileURLToPath } from 'url'
 import path from 'path'
 import { existsSync } from 'fs'
 import { errorHandler } from './src/middleware/error.js'
 
 console.log("🔥 BACKEND SERVER RUNNING")
+console.log("ENV OLLAMA_HOST:", process.env.OLLAMA_HOST)
 
 const app = express()
 
@@ -60,6 +62,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/chat', chatRoutes)
 app.use('/api/logs', logsRoutes)
 app.use('/api/conversations', conversationRoutes)
+app.use('/api/memory', memoryRoutes)
 
 // 4.5 Unknown API
 app.use('/api', (req, res) => {

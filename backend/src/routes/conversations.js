@@ -77,7 +77,8 @@ router.delete('/:id', requireAuth, (req, res, next) => {
     const { id } = req.params
 
     const result = db.prepare(`
-      DELETE FROM conversations
+      UPDATE conversations
+      SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
     `).run(id, req.user.id)
 

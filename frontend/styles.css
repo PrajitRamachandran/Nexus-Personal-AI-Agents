@@ -298,3 +298,145 @@ a:hover { color: var(--accent-hover); }
   .input-area-wrapper { padding: 0 1rem 1rem; }
   .message { padding: 0; }
 }
+
+/* =========================================
+   6. MEMORY TOGGLE BUTTON
+   ========================================= */
+.memory-toggle-btn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 0.55rem 0.75rem;
+  background: transparent; border: 1px solid var(--border-color);
+  color: var(--text-secondary); border-radius: var(--radius-md);
+  font-size: 13px; font-family: inherit; cursor: pointer;
+  transition: all var(--transition); position: relative;
+}
+.memory-toggle-btn:hover {
+  background: var(--bg-hover); color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.memory-count-badge {
+  margin-left: auto; background: var(--accent-color);
+  color: #fff; font-size: 11px; font-weight: 600;
+  padding: 1px 6px; border-radius: var(--radius-full);
+  line-height: 1.6; min-width: 20px; text-align: center;
+}
+
+/* =========================================
+   7. MEMORY PANEL (slide-in)
+   ========================================= */
+.memory-panel {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  width: 280px; z-index: 20;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-color);
+  display: flex; flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 4px 0 20px rgba(0,0,0,0.3);
+}
+.memory-panel.open { transform: translateX(0); }
+
+.memory-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1rem 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.memory-panel-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+
+.memory-close-btn {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; padding: 4px; border-radius: 4px;
+  display: flex; align-items: center; transition: all var(--transition);
+}
+.memory-close-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+.memory-panel-desc {
+  padding: 0.6rem 1rem; font-size: 12px; color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.memory-list {
+  flex: 1; overflow-y: auto; padding: 0.5rem;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.memory-list::-webkit-scrollbar { width: 4px; }
+.memory-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: var(--radius-full); }
+
+/* =========================================
+   8. MEMORY ITEMS
+   ========================================= */
+.memory-item {
+  background: var(--bg-panel); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); padding: 0.75rem;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: all var(--transition); animation: fadeIn 0.2s ease;
+  position: relative;
+}
+.memory-item:hover { border-color: var(--text-muted); }
+.memory-item-removing { opacity: 0; transform: translateX(-10px); }
+
+.memory-item-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+}
+
+.memory-badge {
+  font-size: 10px; font-weight: 600; padding: 2px 8px;
+  border-radius: var(--radius-full); text-transform: lowercase; letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.memory-date {
+  font-size: 11px; color: var(--text-muted); white-space: nowrap; margin-left: auto;
+}
+
+.memory-content {
+  font-size: 13px; color: var(--text-primary); line-height: 1.4; word-wrap: break-word;
+}
+
+.memory-context {
+  font-size: 11px; color: var(--text-muted); font-style: italic; line-height: 1.3;
+}
+
+.memory-delete-btn {
+  display: flex; align-items: center; gap: 4px;
+  align-self: flex-end; background: none;
+  border: 1px solid transparent; color: var(--text-muted);
+  font-size: 11px; font-family: inherit; cursor: pointer;
+  padding: 3px 8px; border-radius: 4px;
+  transition: all var(--transition); opacity: 0;
+}
+.memory-item:hover .memory-delete-btn { opacity: 1; }
+.memory-delete-btn:hover {
+  color: var(--danger); border-color: rgba(239,68,68,0.3);
+  background: rgba(239,68,68,0.08);
+}
+
+.memory-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; text-align: center;
+  padding: 2rem 1rem; color: var(--text-muted); font-size: 13px;
+  flex: 1; line-height: 1.5;
+}
+
+.memory-loading {
+  text-align: center; color: var(--text-muted); font-size: 13px;
+  padding: 2rem 1rem; animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+/* =========================================
+   9. TITLE SHIMMER ANIMATION
+   ========================================= */
+@keyframes titleShimmer {
+  0%   { opacity: 0.3; }
+  50%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+.title-animating {
+  animation: titleShimmer 0.6s ease forwards;
+}

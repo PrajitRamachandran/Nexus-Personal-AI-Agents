@@ -21,7 +21,7 @@ async function readJsonOrText(res) {
   if (isJson && text) {
     try {
       return { json: JSON.parse(text), text }
-    } catch {}
+    } catch { }
   }
 
   return { json: null, text }
@@ -77,6 +77,7 @@ export const api = {
 
   // ===== LOGS =====
   // Changed from 'logs' to 'getLogs' to fix the "api.getLogs is not a function" error
+  // Returns { admin, stats?, logs? } for admin or { admin, log } for regular users
   getLogs: () => request('/api/logs'),
 
   // ===== CONVERSATIONS =====
@@ -108,8 +109,17 @@ export const api = {
     }),
 
 
+  // ===== MEMORY =====
+  getMemory: () => request('/api/memory'),
+
+  deleteMemory: (id) =>
+    request(`/api/memory/${id}`, { method: 'DELETE' }),
+
+  addMemory: (body) =>
+    request('/api/memory', { method: 'POST', body: JSON.stringify(body) }),
+
   // ===== CHAT (STREAMING) =====
-  async chatStream({ conversation_id, message, onToken, onDone, onError }) {
+  async chatStream({ conversation_id, message, onToken, onDone, onError, onTitleUpdate, onMemoryUpdate }) {
     const token = auth.getToken()
     const url = `${BASE}/api/chat`
 
@@ -158,11 +168,21 @@ export const api = {
               onToken?.(json.token)
             }
 
+            // Metrics done event (contains model name)
             if (json.model) {
               onDone?.(json)
             }
 
-          } catch {}
+            // Title update event (arrives separately after done, no model field)
+            if (json.title_update) {
+              onTitleUpdate?.(json.title_update)
+            }
+
+            if (json.memory_update) {
+              onMemoryUpdate?.(json.memory_update)
+            }
+
+          } catch { }
         }
 
         if (line.startsWith('event: error')) {
@@ -170,7 +190,7 @@ export const api = {
           if (nextLine?.startsWith('data:')) {
             try {
               onError?.(JSON.parse(nextLine.slice(5).trim()).error)
-            } catch {}
+            } catch { }
           }
         }
       }
