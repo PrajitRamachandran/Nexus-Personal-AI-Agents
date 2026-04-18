@@ -138,6 +138,14 @@ try {
   if (!e.message.includes('duplicate column')) console.error(e.message)
 }
 
+// Add embedding to memory (serialised float[] from /api/embed — enables semantic search)
+try {
+  db.exec(`ALTER TABLE memory ADD COLUMN embedding TEXT;`)
+  console.log("Added 'embedding' column to memory")
+} catch (e) {
+  if (!e.message.includes('duplicate column')) console.error(e.message)
+}
+
 // Add auto_titled to conversations (ensures title generation fires exactly once)
 try {
   db.exec(`ALTER TABLE conversations ADD COLUMN auto_titled INTEGER DEFAULT 0;`)

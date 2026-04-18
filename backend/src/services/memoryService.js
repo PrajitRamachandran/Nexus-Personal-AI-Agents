@@ -179,7 +179,7 @@ function parseJsonArray(raw) {
     const parsed = JSON.parse(stripped)
     const coerced = coerceArray(parsed)
     if (coerced.length > 0) return coerced
-  } catch {}
+  } catch { }
 
   const match = raw.match(/\[[\s\S]*\]/)
   if (match) {
@@ -187,7 +187,7 @@ function parseJsonArray(raw) {
       const parsed = JSON.parse(match[0])
       const coerced = coerceArray(parsed)
       if (coerced.length > 0) return coerced
-    } catch {}
+    } catch { }
   }
 
   return []
@@ -574,29 +574,49 @@ export async function extractMemory(userMessage) {
 
   try {
     const escapedMsg = userMessage.replace(/`/g, "'").slice(0, 1200)
-    const prompt = `Extract durable long-term memories about the user from the message.
 
-Store ONLY facts that are useful across future chats:
-- identity, name, background, location
-- stable preferences and dislikes
-- recurring habits, routines, workflow, tools, setup
-- ongoing goals, skills being learned, career/education info
-- ongoing or recent projects the user is working on, especially when they ask you to remember/save them
+    const prompt = `Extract durable, reusable long-term user facts from the message.
 
-Do NOT store:
-- one-off requests or the current task
-- temporary facts like "right now", "today", or "for this chat"
-- passwords, tokens, keys, private credentials, or payment details
-- facts about the assistant or generic world facts
+INCLUDE information that remains useful across future conversations:
+- Identity: name, age, background
+- Location (stable, not temporary)
+- Preferences: consistent likes/dislikes
+- Habits & routines
+- Skills, tools, tech stack
+- Education & career details
+- Goals or learning paths
+- Projects (capture even if briefly mentioned, assume ongoing unless clearly temporary)
 
-Return ONLY a JSON array. Each item must be:
-{"content":"User's name is Prajit Ramachandran","context":"when addressing the user","category":"personal"}
+EXCLUDE:
+- One-time requests or current task context
+- Time-bound details (e.g., "today", "right now")
+- Sensitive data (passwords, tokens, financial info)
+- Assumptions beyond reasonable interpretation
+- Anything about the assistant or general knowledge
 
-Allowed categories: personal, preference, habit, goal, skill, work, location, project.
-If there are no durable user facts, return [].
+RULES:
+- Be precise and atomic: one fact per item
+- Avoid duplicates or overlapping facts
+- Keep wording concise and normalized
+- Store facts that are likely useful in future conversations
+- If uncertain but potentially useful, include it
+- Prefer extracting useful information rather than returning empty
+
+OUTPUT FORMAT:
+Return ONLY a JSON array. No explanations.
+
+Each item:
+{
+  "content": "<clear fact>",
+  "context": "<when/how this is useful>",
+  "category": "<one of: personal | preference | habit | goal | skill | work | location | project>"
+}
+
+If absolutely nothing useful → return []
 
 Message: "${escapedMsg}"
 JSON:`
+
 
     const res = await fetch(`${config.ollamaHost}/api/chat`, {
       method: 'POST',
@@ -619,8 +639,14 @@ JSON:`
     const raw = data.message?.content ?? ''
     const llm = parseJsonArray(raw)
 
-    const extracted = mergeMemoryCandidates(heuristic, llm)
-    console.log(`[Memory] Extracted ${extracted.length} item(s):`, extracted)
+    let extracted = []
+
+    if (llm && llm.length > 0) {
+      extracted = normalizeMemoryCandidates(llm)
+    } else {
+      extracted = heuristic
+    }
+    console.log(`[Memory] Source: ${llm.length > 0 ? 'LLM' : 'HEURISTIC'}`)
     return extracted
   } catch (err) {
     if (err.name === 'AbortError') {
@@ -651,6 +677,73 @@ function overlapRatio(a, b) {
   return shared / Math.max(wordsA.size, wordsB.size)
 }
 
+// ─── Semantic embedding helpers ───────────────────────────────────────────────
+
+/**
+ * Requests an embedding vector from Ollama's /api/embed endpoint.
+ * Always uses config.embedModel (nomic-embed-text by default).
+ * Returns a plain number[] on success, or null on any failure.
+ */
+async function generateEmbedding(text) {
+  try {
+    const res = await fetch(`${config.ollamaHost}/api/embed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: config.embedModel,
+        input: text.slice(0, 2000), // guard against oversized inputs
+      }),
+    })
+    if (!res.ok) {
+      console.error(`[Embed] Ollama /api/embed returned ${res.status}`)
+      return null
+    }
+    const data = await res.json()
+    const vec = data?.embeddings?.[0]
+    if (!Array.isArray(vec) || vec.length === 0) {
+      console.error('[Embed] Empty or invalid embedding response')
+      return null
+    }
+    return vec
+  } catch (err) {
+    console.error('[Embed] generateEmbedding failed:', err.message)
+    return null
+  }
+}
+
+/**
+ * Cosine similarity between two vectors.
+ * Ollama's /api/embed returns L2-normalised vectors, so this is a dot product.
+ * Returns a value in [0, 1] for unit vectors (higher = more similar).
+ */
+function cosineSimilarity(a, b) {
+  if (!a || !b || a.length !== b.length) return 0
+  let dot = 0
+  for (let i = 0; i < a.length; i++) dot += a[i] * b[i]
+  // Clamp to [0, 1] — negative cosine similarity means unrelated/opposite
+  return Math.max(0, dot)
+}
+
+function getImportance(memory) {
+  const content = memory.content.toLowerCase()
+
+  // Highest priority (never lose)
+  if (content.includes("name")) return 5
+  if (content.includes("goal")) return 4.5
+
+  // High priority
+  if (memory.category === "project") return 4.5
+  if (memory.category === "work") return 4
+  if (memory.category === "skill") return 3.5
+
+  // Medium
+  if (memory.category === "habit") return 3
+  if (memory.category === "preference") return 2.5
+
+  // Low
+  return 2
+}
+
 export function saveMemory(userId, memories) {
   const toStore = normalizeMemoryCandidates(memories)
   if (toStore.length === 0) {
@@ -658,7 +751,7 @@ export function saveMemory(userId, memories) {
   }
 
   const existing = db.prepare(
-    `SELECT id, content, relevance_score
+    `SELECT id, content, category, relevance_score
      FROM memory
      WHERE user_id = ?
      ORDER BY relevance_score ASC, created_at ASC`
@@ -666,7 +759,7 @@ export function saveMemory(userId, memories) {
 
   const insert = db.prepare(
     `INSERT INTO memory (user_id, content, context, category, relevance_score, last_used)
-     VALUES (?, ?, ?, ?, 1.0, CURRENT_TIMESTAMP)`
+     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
   )
   const touch = db.prepare(
     `UPDATE memory
@@ -682,7 +775,7 @@ export function saveMemory(userId, memories) {
     for (const memory of items) {
       const duplicate = existing.find(stored =>
         stored.content.toLowerCase() === memory.content.toLowerCase() ||
-        overlapRatio(stored.content, memory.content) > 0.82
+        overlapRatio(stored.content, memory.content) > 0.92
       )
 
       if (duplicate) {
@@ -696,7 +789,15 @@ export function saveMemory(userId, memories) {
         if (lowest?.id) evict.run(lowest.id)
       }
 
-      const result = insert.run(userId, memory.content, memory.context, memory.category)
+      const importance = getImportance(memory)
+
+      const result = insert.run(
+        userId,
+        memory.content,
+        memory.context,
+        memory.category,
+        importance
+      )
       const stored = {
         id: result.lastInsertRowid,
         ...memory,
@@ -705,7 +806,7 @@ export function saveMemory(userId, memories) {
       existing.push({
         id: stored.id,
         content: stored.content,
-        relevance_score: 1.0,
+        relevance_score: importance,
       })
       saved.push(stored)
     }
@@ -714,17 +815,33 @@ export function saveMemory(userId, memories) {
     return saved
   })
 
-  const saved = insertAll(toStore)
-  return { saved: saved.length, memories: saved }
+  const savedMemories = insertAll(toStore)
+
+  // Async: generate and persist embeddings for each newly saved memory.
+  // Runs after the synchronous response so it never blocks the caller.
+  if (savedMemories.length > 0) {
+    const embedUpdate = db.prepare(`UPDATE memory SET embedding = ? WHERE id = ?`)
+    ;(async () => {
+      for (const mem of savedMemories) {
+        const vec = await generateEmbedding(mem.content)
+        if (vec) {
+          embedUpdate.run(JSON.stringify(vec), mem.id)
+          console.log(`[Embed] Stored embedding for memory id=${mem.id} ("${mem.content.slice(0, 50)}")`)
+        }
+      }
+    })()
+  }
+
+  return { saved: savedMemories.length, memories: savedMemories }
 }
 
 function isMemoryRecallRequest(message = '') {
   return /\b(?:what do you (?:know|remember) about me|what have you remembered|who am i|what is my name|my memories|memory tab|remember about me|what (?:project|projects) (?:am i|i am) working on|what am i working on|current project|recent project)\b/i.test(message)
 }
 
-export function getRelevantMemory(userId, currentMessage, limit = DEFAULT_RETRIEVAL_LIMIT) {
+export async function getRelevantMemory(userId, currentMessage, limit = DEFAULT_RETRIEVAL_LIMIT) {
   const all = db.prepare(
-    `SELECT id, content, context, category, relevance_score, last_used, created_at
+    `SELECT id, content, context, category, relevance_score, last_used, created_at, embedding
      FROM memory
      WHERE user_id = ?
      ORDER BY created_at DESC
@@ -739,27 +856,77 @@ export function getRelevantMemory(userId, currentMessage, limit = DEFAULT_RETRIE
 
   console.log(`[Memory] Retrieving for user ${userId}: ${all.length} total memories`)
 
+  // ── Semantic query embedding ───────────────────────────────────────────────
+  const queryVec = await generateEmbedding(currentMessage)
+  if (queryVec) {
+    console.log(`[Embed] Query vector generated (dim=${queryVec.length})`)
+  } else {
+    console.warn('[Embed] No query embedding — falling back to keyword-only scoring')
+  }
+
   const queryWords = wordSet(currentMessage)
   const now = Date.now()
+  const message = currentMessage.toLowerCase()
+
+  // ── Category intent detection ──────────────────────────────────────────────
+  const categoryBoostMap = {}
+  if (message.includes('project') || message.includes('working on')) categoryBoostMap.project = 0.4
+  if (message.includes('like') || message.includes('favorite'))       categoryBoostMap.preference = 0.3
+  if (message.includes('goal') || message.includes('trying to'))      categoryBoostMap.goal = 0.4
+  if (message.includes('who am i') || message.includes('my name'))    categoryBoostMap.personal = 0.5
 
   const scored = all.map(memory => {
-    const memoryWords = wordSet(`${memory.content} ${memory.context}`)
-    let overlap = 0
-    for (const word of memoryWords) if (queryWords.has(word)) overlap++
+    // ── Semantic score (80% weight) ──────────────────────────────────────────
+    let semanticScore = 0
+    if (queryVec && memory.embedding) {
+      try {
+        const memVec = JSON.parse(memory.embedding)
+        semanticScore = cosineSimilarity(queryVec, memVec)
+      } catch {
+        // malformed stored embedding — ignore
+      }
+    }
 
+    // ── Keyword score (20% weight) ────────────────────────────────────────────
+    const memoryText = `${memory.content} ${memory.context}`
+    const memoryWords = wordSet(memoryText)
+    let overlap = 0
+    for (const word of memoryWords) {
+      if (queryWords.has(word)) overlap++
+    }
     const keywordScore = memoryWords.size > 0
       ? overlap / Math.max(1, Math.min(memoryWords.size, Math.max(queryWords.size, 1)))
       : 0
 
+    // ── Blended primary score: 80% semantic, 20% keyword ────────────────────
+    // If no embedding exists yet for this memory, use keyword-only as a bridge
+    // until the async backfill stores the embedding.
+    const primaryScore = (queryVec && memory.embedding)
+      ? 0.8 * semanticScore + 0.2 * keywordScore
+      : keywordScore
+
+    // ── Exact phrase boost ────────────────────────────────────────────────────
+    const exactMatch = message.includes(memory.content.toLowerCase().slice(0, 25)) ? 0.4 : 0
+
+    // ── Recency bonus ─────────────────────────────────────────────────────────
     const ageMs = memory.last_used ? now - new Date(memory.last_used).getTime() : now
     const ageDays = Number.isFinite(ageMs) ? ageMs / (1000 * 60 * 60 * 24) : 30
     const recencyBonus = Math.max(0, 0.25 * (1 - ageDays / 45))
-    const relevanceBonus = Math.min(Number(memory.relevance_score || 1), 5) * 0.08
+
+    // ── Importance / usage boost ──────────────────────────────────────────────
+    const relevanceBonus = Math.min(Number(memory.relevance_score || 1), 5) * 0.25
+
+    // ── Recall intent boost ───────────────────────────────────────────────────
     const recallBonus = isMemoryRecallRequest(currentMessage) ? 0.5 : 0
+
+    // ── Category intent boost ─────────────────────────────────────────────────
+    const categoryBoost = categoryBoostMap[memory.category] || 0
 
     return {
       ...memory,
-      score: keywordScore + recencyBonus + relevanceBonus + recallBonus,
+      embedding: undefined, // strip raw blob from returned objects
+      semanticScore,
+      score: primaryScore + exactMatch + recencyBonus + relevanceBonus + recallBonus + categoryBoost,
     }
   })
 
@@ -767,7 +934,10 @@ export function getRelevantMemory(userId, currentMessage, limit = DEFAULT_RETRIE
     .sort((a, b) => b.score - a.score)
     .slice(0, effectiveLimit)
 
-  console.log(`[Memory] Injecting ${selected.length} memories: ${selected.map(m => `"${m.content.slice(0, 40)}"`).join(', ')}`)
+  console.log(
+    `[Memory] Injecting ${selected.length} memories | ` +
+    selected.map(m => `"${m.content.slice(0, 35)}" (sem=${m.semanticScore.toFixed(2)})`).join(', ')
+  )
 
   const bump = db.prepare(
     `UPDATE memory

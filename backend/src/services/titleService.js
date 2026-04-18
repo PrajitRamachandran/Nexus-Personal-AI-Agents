@@ -31,7 +31,7 @@ Title:`
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
-        model: config.ollamaModel,
+        model: config.titleModel,
         messages: [{ role: 'user', content: prompt }],
         stream: false,
       }),

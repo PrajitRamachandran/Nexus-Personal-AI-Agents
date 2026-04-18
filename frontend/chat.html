@@ -547,8 +547,10 @@
           },
           onDone(meta) {
             showStats(meta)
-            // Load conversations immediately when chat response is done
-            // (don't wait for the stream to fully close — title/memory run after)
+            setLoading(false)
+            inputEl.disabled = false
+            inputEl.focus()
+            // Refresh sidebar immediately (shows latest message order)
             loadConversations().catch(() => {})
             refreshMemoryCount()
           },
@@ -564,16 +566,17 @@
           },
           onError(err) {
             contentEl.textContent = err
+            setLoading(false)
+            inputEl.disabled = false
+            inputEl.focus()
           }
         })
 
         refreshMemoryCount()
 
-        // Stream is now fully closed (title + memory done server-side)
         // loadConversations already called in onDone above — no need to repeat
       } catch (err) {
         contentEl.textContent = err.message
-      } finally {
         setLoading(false)
         inputEl.disabled = false
         inputEl.focus()

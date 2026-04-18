@@ -59,7 +59,7 @@ router.post('/', requireAuth, async (req, res) => {
     `).all(conversation_id)
 
     // 🧠 Inject relevant memory into system prompt
-    const memories = getRelevantMemory(req.user.id, message)
+    const memories = await getRelevantMemory(req.user.id, message)
     if (memories.length > 0) {
       const memoryContext = memories
         .map(m => `- ${m.content}${m.context ? ` (${m.context})` : ''}`)
@@ -117,21 +117,21 @@ router.post('/', requireAuth, async (req, res) => {
 
           if (parsed.done) {
             ollamaTimings = {
-              load_ms:        parsed.load_duration        ? Math.round(parsed.load_duration / 1e6)        : null,
+              load_ms: parsed.load_duration ? Math.round(parsed.load_duration / 1e6) : null,
               prompt_eval_ms: parsed.prompt_eval_duration ? Math.round(parsed.prompt_eval_duration / 1e6) : null,
-              eval_ms:        parsed.eval_duration        ? Math.round(parsed.eval_duration / 1e6)        : null,
+              eval_ms: parsed.eval_duration ? Math.round(parsed.eval_duration / 1e6) : null,
             }
-            const evalCount     = parsed.eval_count    ?? 0
+            const evalCount = parsed.eval_count ?? 0
             const evalDurationS = parsed.eval_duration ? parsed.eval_duration / 1e9 : null
             usage = {
-              prompt_tokens:     parsed.prompt_eval_count ?? null,
-              response_tokens:   evalCount || null,
-              total_tokens:      ((parsed.prompt_eval_count ?? 0) + evalCount) || null,
+              prompt_tokens: parsed.prompt_eval_count ?? null,
+              response_tokens: evalCount || null,
+              total_tokens: ((parsed.prompt_eval_count ?? 0) + evalCount) || null,
               tokens_per_second: (evalDurationS && evalCount)
                 ? Math.round((evalCount / evalDurationS) * 10) / 10 : null,
             }
           }
-        } catch {}
+        } catch { }
       }
     }
 
@@ -160,14 +160,14 @@ router.post('/', requireAuth, async (req, res) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         req.user.id, conversation_id, req.user.username, config.ollamaModel,
-        usage.prompt_tokens    ?? null, usage.response_tokens  ?? null, usage.total_tokens     ?? null,
-        ollamaTimings.eval_ms  ?? wallDuration, history.length,
+        usage.prompt_tokens ?? null, usage.response_tokens ?? null, usage.total_tokens ?? null,
+        ollamaTimings.eval_ms ?? wallDuration, history.length,
         userMessage.slice(0, 1000), fullReply.slice(0, 2000),
         ttft, wallDuration,
-        usage.tokens_per_second      ?? null,
-        ollamaTimings.load_ms        ?? null,
+        usage.tokens_per_second ?? null,
+        ollamaTimings.load_ms ?? null,
         ollamaTimings.prompt_eval_ms ?? null,
-        ollamaTimings.eval_ms        ?? null,
+        ollamaTimings.eval_ms ?? null,
         contextLength, fullReply.length, null,
       )
     } catch (logErr) {
@@ -175,15 +175,16 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     // 7. ✅ Send METRICS done event immediately — don't wait for title/memory
+    //    Frontend unlocks the UI as soon as it sees this payload.
     res.write(`data: ${JSON.stringify({
-      model:                  config.ollamaModel,
-      prompt_tokens:          usage.prompt_tokens,
-      response_tokens:        usage.response_tokens,
-      total_tokens:           usage.total_tokens,
-      duration_ms:            ollamaTimings.eval_ms ?? wallDuration,
-      total_wall_ms:          wallDuration,
+      model: config.ollamaModel,
+      prompt_tokens: usage.prompt_tokens,
+      response_tokens: usage.response_tokens,
+      total_tokens: usage.total_tokens,
+      duration_ms: ollamaTimings.eval_ms ?? wallDuration,
+      total_wall_ms: wallDuration,
       time_to_first_token_ms: ttft,
-      tokens_per_second:      usage.tokens_per_second,
+      tokens_per_second: usage.tokens_per_second,
     })}\n\n`)
 
     // ────────────────────────────────────────────────────────────
@@ -193,25 +194,25 @@ router.post('/', requireAuth, async (req, res) => {
 
     // Save durable user facts before title generation so the memory panel can
     // update as soon as long-term memories are stored.
-    if (shouldExtractMemory(userMessage)) {
-      try {
-        const extracted = await extractMemory(userMessage)
-        if (extracted.length > 0) {
-          const memoryResult = saveMemory(req.user.id, extracted)
-          if (memoryResult.saved > 0) {
-            res.write(`data: ${JSON.stringify({
-              memory_update: {
-                saved: memoryResult.saved,
-                memories: memoryResult.memories,
-              },
-            })}\n\n`)
-          }
-        } else {
-          console.log('[Memory] No long-term facts found')
+    try {
+      const extracted = await extractMemory(userMessage)
+
+      if (extracted.length > 0) {
+        const memoryResult = saveMemory(req.user.id, extracted)
+
+        if (memoryResult.saved > 0) {
+          res.write(`data: ${JSON.stringify({
+            memory_update: {
+              saved: memoryResult.saved,
+              memories: memoryResult.memories,
+            },
+          })}\n\n`)
         }
-      } catch (err) {
-        console.error('[Memory] Extraction failed:', err.message)
+      } else {
+        console.log('[Memory] No long-term facts found')
       }
+    } catch (err) {
+      console.error('[Memory] Extraction failed:', err.message)
     }
 
     // Auto-title fires once per conversation and pushes via SSE after done.
@@ -220,15 +221,14 @@ router.post('/', requireAuth, async (req, res) => {
         `SELECT COUNT(*) as cnt FROM messages WHERE conversation_id = ? AND role = 'user'`
       ).get(conversation_id)?.cnt ?? 0
 
-      if (msgCount >= 2 && msgCount <= 4) {
+      if (msgCount >= 1 && msgCount <= 4) {
         try {
           const title = await Promise.race([
             generateTitle(history.filter(m => m.role !== 'system')),
-            new Promise(resolve => setTimeout(() => resolve(null), 15_000)),
+            new Promise(resolve => setTimeout(() => resolve(null), 12_000)),
           ])
           if (title) {
             updateTitle(conversation_id, title)
-            // Send separate title_update event (frontend handles this via onTitleUpdate)
             res.write(`data: ${JSON.stringify({ title_update: { id: conversation_id, title } })}\n\n`)
             console.log(`[Title] Auto-titled conversation ${conversation_id}: "${title}"`)
           }
@@ -245,7 +245,7 @@ router.post('/', requireAuth, async (req, res) => {
     try {
       db.prepare(`INSERT INTO chat_logs (user_id, conversation_id, username, model, total_wall_ms, error) VALUES (?, ?, ?, ?, ?, ?)`)
         .run(req.user.id, conversation_id ?? null, req.user.username, config.ollamaModel, Date.now() - wallStart, errorMessage)
-    } catch {}
+    } catch { }
     res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`)
     res.end()
   }
