@@ -3,21 +3,25 @@
 AI Platform is a lightweight full-stack chat application that combines:
 
 - user registration and login
-- a browser-based chat interface
-- streaming AI responses from Ollama
-- SQLite-backed chat logging and usage tracking
+- a modern, redesigned browser-based chat interface with multi-thread support
+- streaming AI responses from Ollama with agentic background processing
+- intelligent persistent user memory extraction
+- automatic dialogue titling support
+- a highly detailed observability dashboard for LLM performance tracking
+- SQLite-backed chat logging and platform settings
 
-The project is intentionally simple: the backend is an Express server, the frontend is plain HTML/CSS/JavaScript, and the backend serves the frontend directly. That makes it a good starter project for experimenting with local AI integrations without adding a heavy framework.
+The project is designed to be a robust local AI gateway: using Express on the backend, Vanilla JS/CSS for a native-feeling frontend, and interacting directly with Ollama.
 
 ## What It Does
 
 Once the app is running, a user can:
 
-- create an account
-- sign in with email and password
-- send messages to a local Ollama model
-- watch the AI response stream into the UI in real time
-- inspect recent chat logs, including token counts and duration
+- create an account and sign in securely
+- maintain separate concurrent chat sessions managed via a dynamic sidebar
+- send messages to a local Ollama model and see live streamed responses
+- benefit from intelligent memory: the AI remembers personalized facts across sessions
+- see AI-generated conversation titles
+- (as an admin) inspect an advanced observability dashboard capturing TTFT, exact latency, and Ollama metrics
 
 ## Architecture Overview
 
@@ -61,7 +65,12 @@ ai-platform/
 |   |   `-- routes/
 |   |       |-- auth.js
 |   |       |-- chat.js
-|   |       `-- logs.js
+|   |       |-- conversations.js
+|   |       |-- logs.js
+|   |       `-- memory.js
+|   |   `-- services/
+|   |       |-- memoryService.js
+|   |       `-- titleService.js
 |   |-- .env
 |   |-- package.json
 |   `-- server.js
@@ -93,6 +102,22 @@ ai-platform/
 - Ollama replies in a streaming format.
 - The backend forwards streamed token chunks to the browser as they arrive.
 - The frontend appends the response live into the assistant message bubble.
+
+### Intelligent Persistent Memory
+
+- An integrated background extraction pipeline asynchronously reviews chat content to identify long-term user facts and context.
+- Persistent context is saved in SQLite and actively appended to future chats.
+- Users can view extracted facts right from their frontend interface panel.
+
+### Conversation Management
+
+- Auto-generated conversation titles via a background AI parser (`titleService`).
+- Concurrent chat sessions tracked in a sidebar, allowing the user to seamlessly swap contexts.
+
+### Observability Dashboard
+
+- Highly detailed `logs.js` platform capturing extensive operational metrics (Time to First Token, throughput, inference latency, token counts).
+- Secure logs page (`logs.html`) that cleanly surfaces execution details, strictly access-controlled for system administrators.
 
 ### Chat Logging
 
@@ -223,8 +248,8 @@ The root page redirects automatically:
 | `/` | Redirects to login or chat based on auth state |
 | `/login.html` | Sign-in page |
 | `/register.html` | Account creation page |
-| `/chat.html` | Main chat UI |
-| `/logs.html` | Recent chat log viewer |
+| `/chat.html` | Main modern chat UI with sidebar, memory, and multi-chat support |
+| `/logs.html` | Advanced internal observability and logging dashboard |
 
 ## Backend Scripts
 

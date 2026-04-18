@@ -12,6 +12,7 @@ const VALID_CATEGORIES = new Set([
   'skill',
   'work',
   'location',
+  'project',
 ])
 
 const MEMORY_SIGNALS = [
@@ -50,6 +51,10 @@ const MEMORY_SIGNALS = [
   /\bevery (?:day|morning|evening|week)\b/i,
 
   // Goals and ongoing projects
+  /\bmy (?:(?:current|recent|ongoing)\s+)?project\b/i,
+  /\b(?:current|recent|ongoing) project\b/i,
+  /\bproject (?:called|named)\b/i,
+  /\bi(?:'m| am) (?:currently )?working on\b/i,
   /\bmy goal is\b/i,
   /\bi(?:'m| am) trying to\b/i,
   /\bi want to (?:become|learn|build|create|improve|master|practice)\b/i,
@@ -200,7 +205,10 @@ function splitClauses(message) {
 function cleanValue(value = '') {
   return value
     .replace(/\s+(?:and|but|because|so|also)\s+(?:i\b|i'm\b|i am\b|my\b|please\b|give\b|tell\b|can\b|could\b|remember\b|save\b)[\s\S]*$/i, '')
-    .replace(/\b(?:please\s+)?(?:remember|save|keep this in mind)\b[\s\S]*$/i, '')
+    .replace(/[,\s]+(?:please\s+)?(?:remember|keep this in mind)\b[\s\S]*$/i, '')
+    .replace(/[,\s]+(?:please\s+)?save\s+(?:this|that|it|to memory|in memory|for later)\b[\s\S]*$/i, '')
+    .replace(/\b(?:please\s+)?(?:remember|keep this in mind)\b[\s\S]*$/i, '')
+    .replace(/\b(?:please\s+)?save\s+(?:this|that|it|to memory|in memory|for later)\b[\s\S]*$/i, '')
     .replace(/^["'`]+|["'`]+$/g, '')
     .replace(/[.,;:!?]+$/g, '')
     .replace(/\s+/g, ' ')
@@ -217,6 +225,14 @@ function isUsefulValue(value = '') {
   return true
 }
 
+function cleanProjectValue(value = '') {
+  return cleanValue(value)
+    .replace(/^(?:a|an|the)\s+/i, '')
+    .replace(/^(?:current|recent|ongoing)\s+project\s+(?:called|named|is\s+called|is\s+named)?\s*/i, '')
+    .replace(/^project\s+(?:called|named)?\s*/i, '')
+    .trim()
+}
+
 function addCandidate(candidates, content, context, category) {
   const normalizedContent = content.replace(/\s+/g, ' ').trim()
   if (!normalizedContent || hasSensitiveContent(normalizedContent)) return
@@ -226,6 +242,21 @@ function addCandidate(candidates, content, context, category) {
     context: context || '',
     category: VALID_CATEGORIES.has(category) ? category : 'personal',
   })
+}
+
+function addProjectCandidate(candidates, rawValue) {
+  const project = cleanProjectValue(rawValue)
+  if (!isUsefulValue(project)) return
+  const content = /^(?:to|for|about|around)\b/i.test(project)
+    ? `User is working on a project ${project}`
+    : `User is working on ${project}`
+
+  addCandidate(
+    candidates,
+    content,
+    "when discussing the user's projects",
+    'project'
+  )
 }
 
 function extractHeuristicMemory(userMessage) {
@@ -384,6 +415,30 @@ function extractHeuristicMemory(userMessage) {
       continue
     }
 
+    match = clause.match(/\bmy (?:(?:current|recent|ongoing)\s+)?project\s+(?:is|called|named)\s+(.+)/i)
+    if (match) {
+      addProjectCandidate(candidates, match[1])
+      continue
+    }
+
+    match = clause.match(/\b(?:current|recent|ongoing) project\s+(?:is|called|named)\s+(.+)/i)
+    if (match) {
+      addProjectCandidate(candidates, match[1])
+      continue
+    }
+
+    match = clause.match(/\bproject\s+(?:called|named)\s+(.+)/i)
+    if (match) {
+      addProjectCandidate(candidates, match[1])
+      continue
+    }
+
+    match = clause.match(/\bi(?:'m| am)\s+(?:currently\s+)?working on\s+(.+)/i)
+    if (match) {
+      addProjectCandidate(candidates, match[1])
+      continue
+    }
+
     match = clause.match(/\bi(?:'m| am) trying to\s+(.+)/i)
     if (match && isUsefulValue(match[1])) {
       addCandidate(candidates, `User is trying to ${cleanValue(match[1])}`, 'when helping with goals', 'goal')
@@ -464,6 +519,9 @@ function normalizeCategory(category) {
     tools: 'skill',
     career: 'work',
     education: 'skill',
+    projects: 'project',
+    current_project: 'project',
+    recent_project: 'project',
   }
   if (aliases[normalized]) return aliases[normalized]
   return VALID_CATEGORIES.has(normalized) ? normalized : 'personal'
@@ -523,6 +581,7 @@ Store ONLY facts that are useful across future chats:
 - stable preferences and dislikes
 - recurring habits, routines, workflow, tools, setup
 - ongoing goals, skills being learned, career/education info
+- ongoing or recent projects the user is working on, especially when they ask you to remember/save them
 
 Do NOT store:
 - one-off requests or the current task
@@ -533,7 +592,7 @@ Do NOT store:
 Return ONLY a JSON array. Each item must be:
 {"content":"User's name is Prajit Ramachandran","context":"when addressing the user","category":"personal"}
 
-Allowed categories: personal, preference, habit, goal, skill, work, location.
+Allowed categories: personal, preference, habit, goal, skill, work, location, project.
 If there are no durable user facts, return [].
 
 Message: "${escapedMsg}"
@@ -660,7 +719,7 @@ export function saveMemory(userId, memories) {
 }
 
 function isMemoryRecallRequest(message = '') {
-  return /\b(?:what do you (?:know|remember) about me|what have you remembered|who am i|what is my name|my memories|memory tab|remember about me)\b/i.test(message)
+  return /\b(?:what do you (?:know|remember) about me|what have you remembered|who am i|what is my name|my memories|memory tab|remember about me|what (?:project|projects) (?:am i|i am) working on|what am i working on|current project|recent project)\b/i.test(message)
 }
 
 export function getRelevantMemory(userId, currentMessage, limit = DEFAULT_RETRIEVAL_LIMIT) {
