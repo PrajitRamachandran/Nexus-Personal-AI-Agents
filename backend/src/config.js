@@ -16,7 +16,7 @@ export const config = {
   port: process.env.PORT || 3001,
   jwtSecret: process.env.JWT_SECRET,
   ollamaHost: 'http://localhost:11434',
-  ollamaModel: process.env.OLLAMA_MODEL || 'llama3',
+  ollamaModel: process.env.OLLAMA_MODEL || 'gemma3:4b',
   // Dedicated embedding model — MUST be an embedding-capable model.
   // Pull with: ollama pull nomic-embed-text
   embedModel: process.env.EMBED_MODEL || 'nomic-embed-text',

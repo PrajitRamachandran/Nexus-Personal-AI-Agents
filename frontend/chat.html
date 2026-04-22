@@ -27,6 +27,14 @@
 
       <button id="new-chat-btn">New Chat</button>
 
+      <div class="sidebar-search">
+        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="16.65" y1="16.65" x2="21" y2="21"></line>
+        </svg>
+        <input id="conversation-search" type="search" placeholder="Search chats">
+      </div>
+
       <div id="conversation-list"></div>
 
       <div class="sidebar-footer">
@@ -113,6 +121,7 @@
     const logoutBtn       = document.getElementById('logout-btn')
     const convoList       = document.getElementById('conversation-list')
     const newChatBtn      = document.getElementById('new-chat-btn')
+    const searchEl        = document.getElementById('conversation-search')
     const currentChatTitle = document.getElementById('current-chat-title')
     const memoryToggleBtn = document.getElementById('memory-toggle-btn')
     const memoryPanel     = document.getElementById('memory-panel')
@@ -121,6 +130,8 @@
     const memoryCountBadge = document.getElementById('memory-count-badge')
 
     let currentConversationId = null
+    let searchTimer = null
+    let activeSearchQuery = ''
 
     // ─── Username ────────────────────────────────────────────────────────────
     usernameEl.innerHTML = `<span class="avatar-sm"></span> ${auth.getUsername()}`
@@ -133,6 +144,17 @@
     // ─── Input handlers ──────────────────────────────────────────────────────
     sendBtn.addEventListener('click', () => void sendMessage())
     newChatBtn.addEventListener('click', () => void createNewConversation())
+    searchEl.addEventListener('input', () => {
+      window.clearTimeout(searchTimer)
+      searchTimer = window.setTimeout(() => {
+        activeSearchQuery = searchEl.value.trim()
+        if (activeSearchQuery) {
+          void searchConversations(activeSearchQuery)
+        } else {
+          void loadConversations()
+        }
+      }, 180)
+    })
 
     inputEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -266,7 +288,18 @@
     }
 
     function escapeHtml(str) {
-      return (str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+      return (str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g, '&#039;')
+    }
+
+    function escapeRegExp(str) {
+      return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    }
+
+    function highlightHtml(text, query) {
+      const safeText = escapeHtml(text ?? '')
+      const term = String(query ?? '').trim()
+      if (!term) return safeText
+      return safeText.replace(new RegExp(`(${escapeRegExp(term)})`, 'ig'), '<mark class="search-highlight">$1</mark>')
     }
 
     // ─── Update memory badge count (background, no panel open) ───────────────
@@ -330,10 +363,20 @@
       return div
     }
 
-    function appendMessage(role, content) {
+    function appendMessage(role, content, messageId = null) {
       const div = createBubble(role)
+      if (messageId !== null && messageId !== undefined) div.dataset.messageId = messageId
       div.querySelector('p').textContent = content
       messagesEl.scrollTop = messagesEl.scrollHeight
+      return div
+    }
+
+    function appendHighlightedMessage(role, content, query, messageId = null) {
+      const div = createBubble(role)
+      if (messageId !== null && messageId !== undefined) div.dataset.messageId = messageId
+      div.querySelector('p').innerHTML = highlightHtml(content, query)
+      messagesEl.scrollTop = messagesEl.scrollHeight
+      return div
     }
 
     function clearMessages() {
@@ -447,6 +490,40 @@
       convoList.appendChild(item)
     }
 
+    function renderSearchResult(c, query) {
+      const item = document.createElement('div')
+      item.className = 'conversation-item search-result-item'
+      item.dataset.convoId = c.id
+      if (c.id === currentConversationId) item.classList.add('active')
+
+      item.onclick = () => loadConversation(c.id, {
+        query,
+        messageId: c.message_id,
+        matchType: c.match_type,
+      })
+
+      const wrapper = document.createElement('div')
+      wrapper.className = 'search-result-content'
+
+      const top = document.createElement('div')
+      top.className = 'search-result-title'
+      top.innerHTML = highlightHtml(c.title, c.match_type === 'title' ? query : '')
+
+      const meta = document.createElement('div')
+      meta.className = 'search-result-meta'
+      meta.textContent = c.match_type === 'title'
+        ? 'Match in title'
+        : `Match in ${c.message_role === 'user' ? 'your message' : 'Nexus reply'}`
+
+      const snippet = document.createElement('div')
+      snippet.className = 'search-result-snippet'
+      snippet.innerHTML = highlightHtml(c.snippet, query)
+
+      wrapper.append(top, meta, snippet)
+      item.appendChild(wrapper)
+      convoList.appendChild(item)
+    }
+
     async function loadConversations() {
       const convos = await api.conversations()
       convoList.innerHTML = ''
@@ -471,9 +548,36 @@
       return convos
     }
 
-    async function loadConversation(id) {
+    async function searchConversations(query) {
+      convoList.innerHTML = ''
+
+      const lbl = document.createElement('div')
+      lbl.className = 'sidebar-label'
+      lbl.textContent = `Search results`
+      convoList.appendChild(lbl)
+
+      try {
+        const results = await api.searchConversations(query)
+        if (!results.length) {
+          const empty = document.createElement('div')
+          empty.className = 'search-empty'
+          empty.textContent = 'No matching chats'
+          convoList.appendChild(empty)
+          return
+        }
+        results.forEach(c => renderSearchResult(c, query))
+      } catch {
+        const empty = document.createElement('div')
+        empty.className = 'search-empty'
+        empty.textContent = 'Search failed'
+        convoList.appendChild(empty)
+      }
+    }
+
+    async function loadConversation(id, match = null) {
       const data = await api.getConversation(id)
       currentConversationId = id
+      currentChatTitle.textContent = data.title
 
       clearMessages()
       statsBar.classList.add('hidden')
@@ -482,15 +586,41 @@
         showEmptyState()
       } else {
         hideEmptyState()
-        data.messages.forEach(m => appendMessage(m.role, m.content))
+        data.messages.forEach(m => {
+          if (match?.query && m.id === match.messageId) {
+            appendHighlightedMessage(m.role, m.content, match.query, m.id)
+          } else {
+            appendMessage(m.role, m.content, m.id)
+          }
+        })
       }
 
-      await loadConversations()
+      if (activeSearchQuery) {
+        await searchConversations(activeSearchQuery)
+      } else {
+        await loadConversations()
+      }
+
+      if (match?.matchType === 'title') {
+        currentChatTitle.innerHTML = highlightHtml(data.title, match.query)
+      }
+
+      if (match?.query) {
+        requestAnimationFrame(() => {
+          const target = match.messageId
+            ? messagesEl.querySelector(`.message[data-message-id="${match.messageId}"]`)
+            : messagesEl.querySelector('.search-highlight')
+          const scrollTarget = target ?? messagesEl.querySelector('.search-highlight')
+          scrollTarget?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        })
+      }
     }
 
     async function createNewConversation() {
       const convo = await api.createConversation('New Chat')
       currentConversationId = convo.id
+      searchEl.value = ''
+      activeSearchQuery = ''
       clearMessages()
       showEmptyState()
       await loadConversations()
@@ -551,7 +681,11 @@
             inputEl.disabled = false
             inputEl.focus()
             // Refresh sidebar immediately (shows latest message order)
-            loadConversations().catch(() => {})
+            if (activeSearchQuery) {
+              searchConversations(activeSearchQuery).catch(() => {})
+            } else {
+              loadConversations().catch(() => {})
+            }
             refreshMemoryCount()
           },
           onTitleUpdate(update) {

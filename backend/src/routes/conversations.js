@@ -4,6 +4,21 @@ import { db } from '../db/index.js'
 
 const router = Router()
 
+function makeSnippet(text, query, radius = 48) {
+  const content = String(text ?? '')
+  const term = String(query ?? '').trim()
+  const idx = content.toLowerCase().indexOf(term.toLowerCase())
+
+  if (idx === -1) return content.slice(0, radius * 2).trim()
+
+  const start = Math.max(0, idx - radius)
+  const end = Math.min(content.length, idx + term.length + radius)
+  const prefix = start > 0 ? '...' : ''
+  const suffix = end < content.length ? '...' : ''
+
+  return `${prefix}${content.slice(start, end).trim()}${suffix}`
+}
+
 // CREATE conversation
 router.post('/', requireAuth, (req, res, next) => {
   try {
@@ -18,6 +33,69 @@ router.post('/', requireAuth, (req, res, next) => {
       id: result.lastInsertRowid,
       title: title || 'New Chat'
     })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// SEARCH conversations by title or message content
+router.get('/search', requireAuth, (req, res, next) => {
+  try {
+    const q = String(req.query.q ?? '').trim()
+
+    if (!q) {
+      return res.json([])
+    }
+
+    const pattern = `%${q}%`
+    const rows = db.prepare(`
+      SELECT
+        c.id,
+        c.title,
+        c.created_at,
+        c.updated_at,
+        c.pinned,
+        m.id AS message_id,
+        m.role AS message_role,
+        m.content AS message_content,
+        CASE
+          WHEN c.title LIKE ? THEN 'title'
+          ELSE 'message'
+        END AS match_type
+      FROM conversations c
+      LEFT JOIN messages m
+        ON m.conversation_id = c.id
+       AND m.content LIKE ?
+       AND m.id = (
+         SELECT first_match.id
+         FROM messages first_match
+         WHERE first_match.conversation_id = c.id
+           AND first_match.content LIKE ?
+         ORDER BY first_match.created_at ASC, first_match.id ASC
+         LIMIT 1
+       )
+      WHERE c.user_id = ?
+        AND (c.is_deleted IS NULL OR c.is_deleted = 0)
+        AND (c.title LIKE ? OR m.id IS NOT NULL)
+      ORDER BY c.pinned DESC, COALESCE(c.updated_at, c.created_at) DESC, c.id DESC
+      LIMIT 50
+    `).all(pattern, pattern, pattern, req.user.id, pattern)
+
+    const results = rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      pinned: row.pinned,
+      match_type: row.match_type,
+      message_id: row.message_id,
+      message_role: row.message_role,
+      snippet: row.match_type === 'title'
+        ? row.title
+        : makeSnippet(row.message_content, q),
+    }))
+
+    res.json(results)
   } catch (err) {
     next(err)
   }
@@ -55,10 +133,10 @@ router.get('/:id', requireAuth, (req, res, next) => {
     }
 
     const messages = db.prepare(`
-      SELECT role, content, created_at
+      SELECT id, role, content, created_at
       FROM messages
       WHERE conversation_id = ?
-      ORDER BY created_at ASC
+      ORDER BY created_at ASC, id ASC
     `).all(id)
 
     res.json({

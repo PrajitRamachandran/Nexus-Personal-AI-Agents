@@ -83,6 +83,9 @@ export const api = {
   // ===== CONVERSATIONS =====
   conversations: () => request('/api/conversations'),
 
+  searchConversations: (query) =>
+    request(`/api/conversations/search?q=${encodeURIComponent(query)}`),
+
   createConversation: (title) =>
     request('/api/conversations', {
       method: 'POST',
