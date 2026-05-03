@@ -9,6 +9,7 @@ import {
   getRelevantMemory,
 } from '../services/memoryService.js'
 import { generateTitle, updateTitle } from '../services/titleService.js'
+import { getActiveModel } from '../services/modelService.js'
 
 const router = Router()
 
@@ -22,6 +23,7 @@ router.post('/', requireAuth, async (req, res) => {
   const wallStart = Date.now()
   let firstTokenAt = null
   let errorMessage = null
+  const activeModel = getActiveModel()
 
   // SSE headers
   res.setHeader('Content-Type', 'text/event-stream')
@@ -79,7 +81,7 @@ router.post('/', requireAuth, async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: config.ollamaModel,
+        model: activeModel,
         messages: history,
         stream: true,
       }),
@@ -159,7 +161,7 @@ router.post('/', requireAuth, async (req, res) => {
           context_length, response_chars, error
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        req.user.id, conversation_id, req.user.username, config.ollamaModel,
+        req.user.id, conversation_id, req.user.username, activeModel,
         usage.prompt_tokens ?? null, usage.response_tokens ?? null, usage.total_tokens ?? null,
         ollamaTimings.eval_ms ?? wallDuration, history.length,
         userMessage.slice(0, 1000), fullReply.slice(0, 2000),
@@ -177,7 +179,7 @@ router.post('/', requireAuth, async (req, res) => {
     // 7. ✅ Send METRICS done event immediately — don't wait for title/memory
     //    Frontend unlocks the UI as soon as it sees this payload.
     res.write(`data: ${JSON.stringify({
-      model: config.ollamaModel,
+      model: activeModel,
       prompt_tokens: usage.prompt_tokens,
       response_tokens: usage.response_tokens,
       total_tokens: usage.total_tokens,
@@ -244,7 +246,7 @@ router.post('/', requireAuth, async (req, res) => {
     errorMessage = err.message
     try {
       db.prepare(`INSERT INTO chat_logs (user_id, conversation_id, username, model, total_wall_ms, error) VALUES (?, ?, ?, ?, ?, ?)`)
-        .run(req.user.id, conversation_id ?? null, req.user.username, config.ollamaModel, Date.now() - wallStart, errorMessage)
+        .run(req.user.id, conversation_id ?? null, req.user.username, activeModel, Date.now() - wallStart, errorMessage)
     } catch { }
     res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`)
     res.end()

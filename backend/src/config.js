@@ -15,7 +15,7 @@ function resolveBackendPath(filePath) {
 export const config = {
   port: process.env.PORT || 3001,
   jwtSecret: process.env.JWT_SECRET,
-  ollamaHost: 'http://localhost:11434',
+  ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:11434',
   ollamaModel: process.env.OLLAMA_MODEL || 'gemma3:4b',
   // Dedicated embedding model — MUST be an embedding-capable model.
   // Pull with: ollama pull nomic-embed-text

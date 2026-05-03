@@ -80,6 +80,15 @@ export const api = {
   // Returns { admin, stats?, logs? } for admin or { admin, log } for regular users
   getLogs: () => request('/api/logs'),
 
+  // ===== MODELS =====
+  getModels: () => request('/api/models'),
+
+  setActiveModel: (model) =>
+    request('/api/models/active', {
+      method: 'POST',
+      body: JSON.stringify({ model })
+    }),
+
   // ===== CONVERSATIONS =====
   conversations: () => request('/api/conversations'),
 

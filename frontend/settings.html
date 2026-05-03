@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Nexus AI settings">
+  <title>Settings | Nexus AI</title>
+  <script>
+    (() => {
+      const theme = localStorage.getItem('nexus.theme') || 'indigo'
+      const mode = localStorage.getItem('nexus.mode') || 'dark'
+      document.documentElement.dataset.theme = theme
+      document.documentElement.dataset.mode = mode
+    })()
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="settings-page">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="url(#settings-gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <defs>
+            <linearGradient id="settings-gradient" x1="0" y1="0" x2="24" y2="24">
+              <stop offset="0%" stop-color="var(--accent-color)"/>
+              <stop offset="100%" stop-color="var(--accent-hover)"/>
+            </linearGradient>
+          </defs>
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        Nexus AI
+      </div>
+
+      <a href="./chat.html" class="sidebar-action-link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        Back to Chat
+      </a>
+
+      <div style="flex:1"></div>
+
+      <div class="sidebar-footer">
+        <div class="user-profile">
+          <a class="profile-link" href="./settings.html" aria-current="page">
+            <span id="username-display"><span class="avatar-sm"></span><span class="username-text">User</span></span>
+          </a>
+          <button id="logout-btn">Sign out</button>
+        </div>
+        <div class="app-version">Nexus AI v1.1.0</div>
+      </div>
+    </aside>
+
+    <main class="settings-main">
+      <div class="settings-shell">
+        <div class="settings-header">
+          <div>
+            <h1>Settings</h1>
+            <p>Manage appearance, memory, and the active local model.</p>
+          </div>
+          <a href="./chat.html" class="settings-mobile-back">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Chat
+          </a>
+        </div>
+
+        <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+          <button class="settings-tab active" type="button" role="tab" aria-selected="true" data-tab="appearance">Appearance</button>
+          <button class="settings-tab" type="button" role="tab" aria-selected="false" data-tab="memory">Memory</button>
+          <button class="settings-tab" type="button" role="tab" aria-selected="false" data-tab="settings">Settings</button>
+        </div>
+
+        <section id="appearance-panel" class="settings-panel active" role="tabpanel">
+          <div class="settings-section">
+            <div class="settings-row">
+              <div class="settings-label">
+                <strong>Theme</strong>
+                <span>Accent colors update across the app.</span>
+              </div>
+              <div class="settings-control">
+                <select id="theme-select" class="settings-select" aria-label="Theme"></select>
+                <span class="theme-swatch" aria-hidden="true"></span>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label">
+                <strong>Mode</strong>
+                <span id="mode-copy">Dark mode is active.</span>
+              </div>
+              <div class="settings-control">
+                <label class="switch" title="Toggle light mode">
+                  <input id="mode-toggle" type="checkbox" aria-label="Toggle light mode">
+                  <span class="switch-track"></span>
+                </label>
+                <span id="mode-label" class="settings-status">Dark</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="memory-panel" class="settings-panel" role="tabpanel">
+          <div class="settings-section">
+            <div class="settings-row">
+              <div class="settings-label">
+                <strong>Long-term Memory</strong>
+                <span id="memory-count">Loading memories...</span>
+              </div>
+              <div id="memory-list" class="memory-list memory-page-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="settings-panel" class="settings-panel" role="tabpanel">
+          <div class="settings-section">
+            <div class="settings-row">
+              <div class="settings-label">
+                <strong>Active Model</strong>
+                <span>Choose from locally pulled Ollama LLMs.</span>
+              </div>
+              <div class="settings-control">
+                <select id="model-select" class="settings-select" aria-label="Active model"></select>
+                <span id="model-status" class="settings-status">Loading models...</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module">
+    import './theme.js'
+    import { api } from './api.js'
+    import { auth } from './auth.js'
+    import { themes, getAppearance, setMode, setTheme } from './theme.js'
+    import { loadMemoryList } from './memory-ui.js'
+
+    if (!auth.isLoggedIn()) window.location.href = './login.html'
+
+    const usernameEl = document.getElementById('username-display')
+    const logoutBtn = document.getElementById('logout-btn')
+    const tabs = [...document.querySelectorAll('.settings-tab')]
+    const panels = [...document.querySelectorAll('.settings-panel')]
+    const themeSelect = document.getElementById('theme-select')
+    const modeToggle = document.getElementById('mode-toggle')
+    const modeLabel = document.getElementById('mode-label')
+    const modeCopy = document.getElementById('mode-copy')
+    const modelSelect = document.getElementById('model-select')
+    const modelStatus = document.getElementById('model-status')
+    const memoryList = document.getElementById('memory-list')
+    const memoryCount = document.getElementById('memory-count')
+
+    let memoryLoaded = false
+
+    usernameEl.querySelector('.username-text').textContent = auth.getUsername() || 'User'
+
+    logoutBtn.addEventListener('click', () => {
+      auth.logout()
+      window.location.href = './login.html'
+    })
+
+    function activateTab(tabName, updateHash = true) {
+      const safeTab = ['appearance', 'memory', 'settings'].includes(tabName) ? tabName : 'appearance'
+
+      tabs.forEach(tab => {
+        const active = tab.dataset.tab === safeTab
+        tab.classList.toggle('active', active)
+        tab.setAttribute('aria-selected', active ? 'true' : 'false')
+      })
+
+      panels.forEach(panel => {
+        panel.classList.toggle('active', panel.id === `${safeTab}-panel`)
+      })
+
+      if (updateHash) {
+        history.replaceState(null, '', `#${safeTab}`)
+      }
+
+      if (safeTab === 'memory' && !memoryLoaded) {
+        memoryLoaded = true
+        void loadMemoryList(memoryList, { statusEl: memoryCount })
+      }
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => activateTab(tab.dataset.tab))
+    })
+
+    function syncAppearanceControls() {
+      const appearance = getAppearance()
+      themeSelect.value = appearance.theme
+      modeToggle.checked = appearance.mode === 'light'
+      modeLabel.textContent = appearance.mode === 'light' ? 'Light' : 'Dark'
+      modeCopy.textContent = appearance.mode === 'light'
+        ? 'Light mode is active.'
+        : 'Dark mode is active.'
+    }
+
+    themes.forEach(theme => {
+      const option = document.createElement('option')
+      option.value = theme.value
+      option.textContent = theme.label
+      themeSelect.appendChild(option)
+    })
+
+    themeSelect.addEventListener('change', () => {
+      setTheme(themeSelect.value)
+      syncAppearanceControls()
+    })
+
+    modeToggle.addEventListener('change', () => {
+      setMode(modeToggle.checked ? 'light' : 'dark')
+      syncAppearanceControls()
+    })
+
+    window.addEventListener('appearancechange', syncAppearanceControls)
+    syncAppearanceControls()
+
+    function setModelStatus(message, className = '') {
+      modelStatus.textContent = message
+      modelStatus.className = `settings-status ${className}`.trim()
+    }
+
+    function renderModelOptions(models, activeModel) {
+      modelSelect.innerHTML = ''
+
+      if (!models.length) {
+        const option = document.createElement('option')
+        option.textContent = 'No local LLM models found'
+        option.value = ''
+        modelSelect.appendChild(option)
+        modelSelect.disabled = true
+        setModelStatus('Pull a chat model in Ollama first.', 'error')
+        return
+      }
+
+      models.forEach(model => {
+        const option = document.createElement('option')
+        option.value = model.name
+        option.textContent = model.details?.parameter_size
+          ? `${model.name} (${model.details.parameter_size})`
+          : model.name
+        modelSelect.appendChild(option)
+      })
+
+      modelSelect.disabled = false
+      modelSelect.value = activeModel
+      localStorage.setItem('nexus.activeModel', activeModel)
+      setModelStatus(`Active: ${activeModel}`, 'ok')
+    }
+
+    async function loadModels() {
+      modelSelect.disabled = true
+      setModelStatus('Loading models...')
+
+      try {
+        const data = await api.getModels()
+        renderModelOptions(data.models || [], data.activeModel)
+      } catch (err) {
+        modelSelect.innerHTML = '<option value="">Unable to load models</option>'
+        modelSelect.disabled = true
+        setModelStatus(err.message, 'error')
+      }
+    }
+
+    modelSelect.addEventListener('change', async () => {
+      const model = modelSelect.value
+      if (!model) return
+
+      const previous = localStorage.getItem('nexus.activeModel')
+      modelSelect.disabled = true
+      setModelStatus('Switching model...')
+
+      try {
+        const data = await api.setActiveModel(model)
+        renderModelOptions(data.models || [], data.activeModel)
+        window.dispatchEvent(new CustomEvent('modelchange', { detail: { model: data.activeModel } }))
+      } catch (err) {
+        if (previous) modelSelect.value = previous
+        setModelStatus(err.message, 'error')
+      } finally {
+        modelSelect.disabled = false
+      }
+    })
+
+    activateTab(location.hash.replace('#', ''), false)
+    void loadModels()
+  </script>
+</body>
+</html>

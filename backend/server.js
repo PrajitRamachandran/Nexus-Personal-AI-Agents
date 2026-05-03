@@ -8,6 +8,7 @@ import chatRoutes from './src/routes/chat.js'
 import logsRoutes from './src/routes/logs.js'
 import conversationRoutes from './src/routes/conversations.js'
 import memoryRoutes from './src/routes/memory.js'
+import modelRoutes from './src/routes/models.js'
 import { fileURLToPath } from 'url'
 import path from 'path'
 import { existsSync } from 'fs'
@@ -63,6 +64,7 @@ app.use('/api/chat', chatRoutes)
 app.use('/api/logs', logsRoutes)
 app.use('/api/conversations', conversationRoutes)
 app.use('/api/memory', memoryRoutes)
+app.use('/api/models', modelRoutes)
 
 // 4.5 Unknown API
 app.use('/api', (req, res) => {

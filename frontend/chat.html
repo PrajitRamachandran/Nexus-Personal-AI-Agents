@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Nexus AI — Your intelligent AI workspace with persistent memory">
   <title>Nexus AI</title>
+  <script>
+    (() => {
+      const theme = localStorage.getItem('nexus.theme') || 'indigo'
+      const mode = localStorage.getItem('nexus.mode') || 'dark'
+      document.documentElement.dataset.theme = theme
+      document.documentElement.dataset.mode = mode
+    })()
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="chat-page">
@@ -16,8 +24,8 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="url(#gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <defs>
             <linearGradient id="gradient" x1="0" y1="0" x2="24" y2="24">
-              <stop offset="0%" stop-color="#6366f1"/>
-              <stop offset="100%" stop-color="#8b5cf6"/>
+              <stop offset="0%" stop-color="var(--accent-color)"/>
+              <stop offset="100%" stop-color="var(--accent-hover)"/>
             </linearGradient>
           </defs>
           <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
@@ -39,43 +47,14 @@
 
       <div class="sidebar-footer">
         <div class="user-profile">
-          <span id="username-display"><span class="avatar-sm"></span>User</span>
+          <a class="profile-link" href="./settings.html" title="Open settings">
+            <span id="username-display"><span class="avatar-sm"></span><span class="username-text">User</span></span>
+          </a>
           <button id="logout-btn">Sign out</button>
         </div>
 
-        <!-- Memory Panel Toggle -->
-        <button id="memory-toggle-btn" class="memory-toggle-btn" title="View long-term memory">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
-          </svg>
-          Memory
-          <span id="memory-count-badge" class="memory-count-badge hidden">0</span>
-        </button>
-
         <div class="app-version">Nexus AI v1.1.0</div>
       </div>
-    </div>
-
-    <!-- Memory Panel (slide-in over sidebar content area) -->
-    <div id="memory-panel" class="memory-panel hidden">
-      <div class="memory-panel-header">
-        <div class="memory-panel-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
-          </svg>
-          Long-term Memory
-        </div>
-        <button id="memory-close-btn" class="memory-close-btn" title="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-      <div class="memory-panel-desc">
-        Facts Nexus remembers about you across all conversations.
-      </div>
-      <div id="memory-list" class="memory-list"></div>
     </div>
 
     <div class="main">
@@ -107,6 +86,7 @@
   </div>
 
   <script type="module">
+    import './theme.js'
     import { api } from './api.js'
     import { auth } from './auth.js'
 
@@ -123,18 +103,13 @@
     const newChatBtn      = document.getElementById('new-chat-btn')
     const searchEl        = document.getElementById('conversation-search')
     const currentChatTitle = document.getElementById('current-chat-title')
-    const memoryToggleBtn = document.getElementById('memory-toggle-btn')
-    const memoryPanel     = document.getElementById('memory-panel')
-    const memoryCloseBtn  = document.getElementById('memory-close-btn')
-    const memoryList      = document.getElementById('memory-list')
-    const memoryCountBadge = document.getElementById('memory-count-badge')
 
     let currentConversationId = null
     let searchTimer = null
     let activeSearchQuery = ''
 
     // ─── Username ────────────────────────────────────────────────────────────
-    usernameEl.innerHTML = `<span class="avatar-sm"></span> ${auth.getUsername()}`
+    usernameEl.querySelector('.username-text').textContent = auth.getUsername() || 'User'
 
     logoutBtn.addEventListener('click', () => {
       auth.logout()
@@ -171,122 +146,6 @@
       document.querySelectorAll('.dropdown').forEach(d => d.classList.add('hidden'))
     })
 
-    // ─── Memory Panel ─────────────────────────────────────────────────────────
-    memoryToggleBtn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      const isHidden = memoryPanel.classList.contains('hidden')
-      if (isHidden) {
-        memoryPanel.classList.remove('hidden')
-        requestAnimationFrame(() => memoryPanel.classList.add('open'))
-        loadMemoryPanel()
-      } else {
-        closeMemoryPanel()
-      }
-    })
-
-    memoryCloseBtn.addEventListener('click', closeMemoryPanel)
-
-    function closeMemoryPanel() {
-      memoryPanel.classList.remove('open')
-      setTimeout(() => memoryPanel.classList.add('hidden'), 250)
-    }
-
-    async function loadMemoryPanel() {
-      memoryList.innerHTML = `<div class="memory-loading">Loading memories…</div>`
-      try {
-        const { memories } = await api.getMemory()
-        renderMemoryList(memories)
-      } catch {
-        memoryList.innerHTML = `<div class="memory-empty">Failed to load memories.</div>`
-      }
-    }
-
-    function renderMemoryList(memories) {
-      // Update count badge
-      if (memories.length > 0) {
-        memoryCountBadge.textContent = memories.length
-        memoryCountBadge.classList.remove('hidden')
-      } else {
-        memoryCountBadge.classList.add('hidden')
-      }
-
-      if (memories.length === 0) {
-        memoryList.innerHTML = `
-          <div class="memory-empty">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4; margin-bottom:8px">
-              <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
-            </svg>
-            <p>No memories yet.</p>
-            <p style="font-size:12px; margin-top:4px;">Share personal info or preferences and Nexus will remember them.</p>
-          </div>`
-        return
-      }
-
-      memoryList.innerHTML = ''
-      memories.forEach(m => {
-        const item = document.createElement('div')
-        item.className = 'memory-item'
-        item.dataset.id = m.id
-
-        const categoryColors = {
-          preference: '#6366f1',
-          habit:      '#f59e0b',
-          personal:   '#10b981',
-          goal:       '#ec4899',
-          skill:      '#3b82f6',
-          project:    '#14b8a6',
-        }
-        const color = categoryColors[m.category] ?? '#6b6b75'
-        const lastUsed = m.last_used
-          ? new Date(m.last_used).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-          : 'Never used'
-
-        item.innerHTML = `
-          <div class="memory-item-header">
-            <span class="memory-badge" style="background: ${color}20; color: ${color}; border: 1px solid ${color}40">${m.category}</span>
-            <span class="memory-date">${lastUsed}</span>
-          </div>
-          <p class="memory-content">${escapeHtml(m.content)}</p>
-          ${m.context ? `<p class="memory-context">${escapeHtml(m.context)}</p>` : ''}
-          <button class="memory-delete-btn" data-id="${m.id}" title="Delete this memory">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6l-1 14H6L5 6"></path>
-              <path d="M10 11v6M14 11v6"></path>
-              <path d="M9 6V4h6v2"></path>
-            </svg>
-            Delete
-          </button>
-        `
-        memoryList.appendChild(item)
-      })
-
-      // Delete handlers
-      memoryList.querySelectorAll('.memory-delete-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation()
-          const id = Number(btn.dataset.id)
-          const item = memoryList.querySelector(`.memory-item[data-id="${id}"]`)
-          if (!item) return
-          item.style.opacity = '0.4'
-          try {
-            await api.deleteMemory(id)
-            item.classList.add('memory-item-removing')
-            setTimeout(() => item.remove(), 250)
-            // Re-count
-            const remaining = memoryList.querySelectorAll('.memory-item').length - 1
-            if (remaining <= 0) {
-              renderMemoryList([])
-            } else {
-              memoryCountBadge.textContent = remaining
-            }
-          } catch {
-            item.style.opacity = '1'
-          }
-        })
-      })
-    }
-
     function escapeHtml(str) {
       return (str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g, '&#039;')
     }
@@ -300,19 +159,6 @@
       const term = String(query ?? '').trim()
       if (!term) return safeText
       return safeText.replace(new RegExp(`(${escapeRegExp(term)})`, 'ig'), '<mark class="search-highlight">$1</mark>')
-    }
-
-    // ─── Update memory badge count (background, no panel open) ───────────────
-    async function refreshMemoryCount() {
-      try {
-        const { memories } = await api.getMemory()
-        if (memories.length > 0) {
-          memoryCountBadge.textContent = memories.length
-          memoryCountBadge.classList.remove('hidden')
-        } else {
-          memoryCountBadge.classList.add('hidden')
-        }
-      } catch {}
     }
 
     // ─── Real-time title update (from SSE done event) ─────────────────────────
@@ -686,17 +532,10 @@
             } else {
               loadConversations().catch(() => {})
             }
-            refreshMemoryCount()
           },
           onTitleUpdate(update) {
             // Real-time title push — arrives a few seconds after onDone
             applyTitleUpdate(update)
-          },
-          onMemoryUpdate() {
-            refreshMemoryCount()
-            if (!memoryPanel.classList.contains('hidden')) {
-              loadMemoryPanel()
-            }
           },
           onError(err) {
             contentEl.textContent = err
@@ -705,8 +544,6 @@
             inputEl.focus()
           }
         })
-
-        refreshMemoryCount()
 
         // loadConversations already called in onDone above — no need to repeat
       } catch (err) {
@@ -727,8 +564,6 @@
         showEmptyState()
       }
 
-      // Load initial memory badge count
-      refreshMemoryCount()
     }
 
     init()

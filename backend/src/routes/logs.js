@@ -38,7 +38,7 @@ router.get('/', requireAuth, (req, res, next) => {
         FROM chat_logs
       `).get()
 
-      return res.json({ admin: true, stats, logs })
+      return res.json({ admin: true, stats, logs, modelLogs: logs })
     }
 
     // Non-admin: only their single most recent log, limited fields
@@ -56,7 +56,21 @@ router.get('/', requireAuth, (req, res, next) => {
       LIMIT 1
     `).get(req.user.id)
 
-    return res.json({ admin: false, log: log || null })
+    const modelLogs = db.prepare(`
+      SELECT
+        model, created_at,
+        prompt_tokens, response_tokens, total_tokens,
+        duration_ms, time_to_first_token_ms, total_wall_ms,
+        tokens_per_second,
+        ollama_load_ms, ollama_prompt_eval_ms, ollama_eval_ms,
+        context_length, response_chars, error
+      FROM chat_logs
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 500
+    `).all(req.user.id)
+
+    return res.json({ admin: false, log: log || null, modelLogs })
 
   } catch (err) {
     next(err)

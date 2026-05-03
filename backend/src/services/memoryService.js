@@ -1,5 +1,6 @@
 import { db } from '../db/index.js'
 import { config } from '../config.js'
+import { getActiveModel } from './modelService.js'
 
 const MAX_MEMORIES_PER_USER = 200
 const DEFAULT_RETRIEVAL_LIMIT = 10
@@ -623,7 +624,7 @@ JSON:`
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
-        model: config.ollamaModel,
+        model: getActiveModel(),
         messages: [{ role: 'user', content: prompt }],
         stream: false,
         format: 'json',

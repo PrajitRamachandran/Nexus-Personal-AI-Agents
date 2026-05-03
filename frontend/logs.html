@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Observability Dashboard | Nexus AI</title>
   <meta name="description" content="LLM performance monitoring: latency, TTFT, tokens/sec and more.">
+  <script>
+    (() => {
+      const theme = localStorage.getItem('nexus.theme') || 'indigo'
+      const mode = localStorage.getItem('nexus.mode') || 'dark'
+      document.documentElement.dataset.theme = theme
+      document.documentElement.dataset.mode = mode
+    })()
+  </script>
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -26,7 +34,7 @@
 
     .obs-header {
       position: sticky; top: 0; z-index: 20;
-      background: rgba(13,13,15,0.85); backdrop-filter: blur(16px);
+      background: var(--header-bg); backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border-color);
       padding: 0 1.5rem;
       display: flex; align-items: center; justify-content: space-between;
@@ -34,9 +42,9 @@
     }
     .obs-header-left  { display: flex; align-items: center; gap: 12px; }
     .obs-title        { font-size: 16px; font-weight: 600; color: var(--text-primary); }
-    .obs-badge        { font-size: 11px; font-weight: 700; background: rgba(99,102,241,0.15);
+    .obs-badge        { font-size: 11px; font-weight: 700; background: var(--accent-soft);
                         color: var(--accent-color); padding: 3px 10px; border-radius: 999px;
-                        border: 1px solid rgba(99,102,241,0.3); letter-spacing: 0.5px; text-transform: uppercase; }
+                        border: 1px solid var(--accent-border); letter-spacing: 0.5px; text-transform: uppercase; }
     .back-link {
       font-size: 13px; color: var(--text-secondary); text-decoration: none; font-weight: 500;
       display: flex; align-items: center; gap: 6px; padding: 7px 14px;
@@ -46,6 +54,21 @@
     .back-link:hover { color: var(--text-primary); background: var(--bg-hover); }
 
     .obs-body { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 6rem; }
+
+    .logs-tabs {
+      display: flex; gap: 0.35rem; border-bottom: 1px solid var(--border-color);
+      margin-bottom: 1.5rem; overflow-x: auto;
+    }
+    .logs-tab {
+      background: transparent; border: none; color: var(--text-secondary);
+      cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600;
+      padding: 0.85rem 1rem; border-bottom: 2px solid transparent;
+      white-space: nowrap; transition: color 0.2s, border-color 0.2s;
+    }
+    .logs-tab:hover { color: var(--text-primary); }
+    .logs-tab.active { color: var(--accent-color); border-bottom-color: var(--accent-color); }
+    .logs-tab-panel { display: none; }
+    .logs-tab-panel.active { display: block; }
 
     /* ── Stat Cards ── */
     .stat-grid {
@@ -97,8 +120,36 @@
       border-radius: 16px; overflow: hidden;
       transition: border-color 0.2s, transform 0.2s;
     }
-    .log-card:hover { border-color: #3f3f46; transform: translateY(-1px); }
+    .log-card:hover { border-color: var(--text-muted); transform: translateY(-1px); }
     .log-card.has-error { border-color: rgba(239,68,68,0.3); }
+
+    .model-group-list { display: flex; flex-direction: column; gap: 1rem; }
+    .model-group-title {
+      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+      padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color);
+    }
+    .model-group-name {
+      color: var(--text-primary); font-weight: 700; font-family: 'JetBrains Mono', monospace;
+      word-break: break-word;
+    }
+    .model-group-sub { color: var(--text-muted); font-size: 12px; }
+    .model-recent-list { display: flex; flex-direction: column; }
+    .model-recent-row {
+      display: grid; grid-template-columns: minmax(130px, 1fr) repeat(4, minmax(92px, auto));
+      gap: 0.75rem; align-items: center; padding: 0.75rem 1.25rem;
+      border-top: 1px solid var(--border-color); color: var(--text-secondary);
+      font-size: 12px;
+    }
+    .model-recent-row:first-child { border-top: none; }
+    .model-recent-metric {
+      font-family: 'JetBrains Mono', monospace; color: var(--text-primary);
+      font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+    @media (max-width: 760px) {
+      .model-recent-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
 
     .log-top {
       padding: 1rem 1.25rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;
@@ -111,9 +162,9 @@
       font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0;
     }
     .log-model-badge {
-      background: rgba(99,102,241,0.12); color: var(--accent-color);
+      background: var(--accent-soft); color: var(--accent-color);
       padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
-      border: 1px solid rgba(99,102,241,0.25); font-family: 'JetBrains Mono', monospace;
+      border: 1px solid var(--accent-border); font-family: 'JetBrains Mono', monospace;
     }
     .error-badge {
       background: rgba(239,68,68,0.1); color: var(--red);
@@ -149,7 +200,7 @@
       width: 100%; text-align: left; font-family: inherit; transition: color 0.15s;
     }
     .internals-toggle:hover { color: var(--text-secondary); }
-    .internals-panel { display: none; background: rgba(0,0,0,0.2); }
+    .internals-panel { display: none; background: var(--bg-panel); }
     .internals-panel.open { display: block; }
     .internals-grid {
       display: flex; flex-wrap: wrap; gap: 0;
@@ -180,7 +231,7 @@
     /* ── Non-admin view ── */
     .info-banner {
       display: flex; align-items: center; gap: 12px;
-      background: rgba(99,102,241,0.07); border: 1px solid rgba(99,102,241,0.2);
+      background: var(--accent-soft); border: 1px solid var(--accent-border);
       border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 2rem;
       font-size: 13px; color: var(--text-secondary);
     }
@@ -225,6 +276,7 @@
   </div>
 
   <script type="module">
+    import './theme.js'
     import { api } from './api.js'
     import { auth } from './auth.js'
 
@@ -232,6 +284,15 @@
 
     const body   = document.getElementById('obs-body')
     const badge  = document.getElementById('access-badge')
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+    }
 
     // ── Formatters ──
     const fmt = {
@@ -326,6 +387,123 @@
 
       input.addEventListener('input', applyFilter)
       applyFilter()
+    }
+
+    // ── Log tabs and model grouping ──
+    function bindLogTabs() {
+      const tabButtons = [...document.querySelectorAll('.logs-tab')]
+      const panels = [...document.querySelectorAll('.logs-tab-panel')]
+
+      tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          const target = button.dataset.tab
+
+          tabButtons.forEach(tab => {
+            const active = tab.dataset.tab === target
+            tab.classList.toggle('active', active)
+            tab.setAttribute('aria-selected', active ? 'true' : 'false')
+          })
+
+          panels.forEach(panel => {
+            panel.classList.toggle('active', panel.id === `${target}-panel`)
+          })
+        })
+      })
+    }
+
+    function logsTabShell(allLogsHtml, modelWiseHtml) {
+      return `
+        <div class="logs-tabs" role="tablist" aria-label="Log views">
+          <button class="logs-tab active" type="button" role="tab" aria-selected="true" data-tab="all-logs">All Logs</button>
+          <button class="logs-tab" type="button" role="tab" aria-selected="false" data-tab="model-wise">Model Wise Logs</button>
+        </div>
+        <section id="all-logs-panel" class="logs-tab-panel active" role="tabpanel">
+          ${allLogsHtml}
+        </section>
+        <section id="model-wise-panel" class="logs-tab-panel" role="tabpanel">
+          ${modelWiseHtml}
+        </section>`
+    }
+
+    function finiteNumbers(items, key) {
+      return items
+        .map(item => Number(item[key]))
+        .filter(value => Number.isFinite(value))
+    }
+
+    function avg(items, key) {
+      const values = finiteNumbers(items, key)
+      if (!values.length) return null
+      return values.reduce((sum, value) => sum + value, 0) / values.length
+    }
+
+    function sum(items, key) {
+      const values = finiteNumbers(items, key)
+      if (!values.length) return null
+      return values.reduce((total, value) => total + value, 0)
+    }
+
+    function getModelLogs(data) {
+      if (Array.isArray(data.modelLogs)) return data.modelLogs
+      if (Array.isArray(data.logs)) return data.logs
+      return data.log ? [data.log] : []
+    }
+
+    function buildModelWiseLogs(logs) {
+      if (!logs.length) {
+        return '<div class="empty-state">No model logs yet. Send a message to generate the first entry.</div>'
+      }
+
+      const groups = new Map()
+      logs.forEach(log => {
+        const model = log.model || 'Unknown model'
+        if (!groups.has(model)) groups.set(model, [])
+        groups.get(model).push(log)
+      })
+
+      const groupHtml = [...groups.entries()].map(([model, entries]) => {
+        const errorCount = entries.filter(log => log.error).length
+        const avgTtft = avg(entries, 'time_to_first_token_ms')
+        const avgWall = avg(entries, 'total_wall_ms')
+        const avgEval = avg(entries, 'duration_ms')
+        const avgTps = avg(entries, 'tokens_per_second')
+        const totalTokens = sum(entries, 'total_tokens')
+        const promptTokens = sum(entries, 'prompt_tokens')
+        const responseTokens = sum(entries, 'response_tokens')
+
+        const recentRows = entries.slice(0, 5).map(log => `
+          <div class="model-recent-row">
+            <span>${fmt.date(log.created_at)}</span>
+            <span class="model-recent-metric">TTFT ${fmt.ms(log.time_to_first_token_ms)}</span>
+            <span class="model-recent-metric">Full ${fmt.ms(log.total_wall_ms)}</span>
+            <span class="model-recent-metric">Tokens ${fmt.num(log.total_tokens)}</span>
+            <span class="model-recent-metric">TPS ${fmt.dec(log.tokens_per_second)}</span>
+          </div>`).join('')
+
+        return `
+          <div class="log-card">
+            <div class="model-group-title">
+              <span class="log-model-badge">${escapeHtml(model)}</span>
+              <span class="model-group-name">${escapeHtml(model)}</span>
+              <span class="model-group-sub">${fmt.num(entries.length)} request${entries.length === 1 ? '' : 's'}</span>
+            </div>
+            <div class="metrics-row">
+              ${metricCell('Avg TTFT', fmt.ms(avgTtft), ttftColor(avgTtft), 'time to first token')}
+              ${metricCell('Full Response', fmt.ms(avgWall), wallColor(avgWall), 'avg wall time')}
+              ${metricCell('Gen Time', fmt.ms(avgEval), wallColor(avgEval), 'avg Ollama eval')}
+              ${metricCell('Total Tokens', fmt.num(totalTokens), 'c-teal', 'generated + prompt')}
+              ${metricCell('Prompt Tokens', fmt.num(promptTokens), 'c-blue')}
+              ${metricCell('Response Tokens', fmt.num(responseTokens), 'c-purple')}
+              ${metricCell('Tokens / sec', fmt.dec(avgTps), tpsColor(avgTps), 'average')}
+              ${metricCell('Errors', fmt.num(errorCount), errorCount ? 'c-red' : 'c-green')}
+            </div>
+            <div class="model-recent-list">
+              ${recentRows}
+            </div>
+          </div>`
+      }).join('')
+
+      return `<div class="section-title">Model Wise Logs</div><div class="model-group-list">${groupHtml}</div>`
     }
 
     // ── Build one log card ──
@@ -441,7 +619,11 @@
           <span class="filter-count" id="filter-count"></span>
         </div>`
 
-      body.innerHTML = statsHtml + filterHtml + '<div class="log-list" id="log-list"></div>'
+      body.innerHTML = logsTabShell(
+        statsHtml + filterHtml + '<div class="log-list" id="log-list"></div>',
+        buildModelWiseLogs(getModelLogs(data))
+      )
+      bindLogTabs()
 
       const list   = document.getElementById('log-list')
       const cards  = []
@@ -463,7 +645,7 @@
     function renderUser(data) {
       badge.textContent = 'User View'
 
-      body.innerHTML = `
+      const userHtml = `
         <div class="info-banner">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -472,6 +654,9 @@
         </div>
         <div class="section-title">Your Last Request</div>
         <div id="user-log-container"></div>`
+
+      body.innerHTML = logsTabShell(userHtml, buildModelWiseLogs(getModelLogs(data)))
+      bindLogTabs()
 
       const container = document.getElementById('user-log-container')
 

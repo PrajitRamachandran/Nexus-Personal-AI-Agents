@@ -1,5 +1,6 @@
 import { db } from '../db/index.js'
 import { config } from '../config.js'
+import { getActiveModel } from './modelService.js'
 
 /**
  * Generates a concise 3-6 word title for a conversation based on message history.
@@ -31,7 +32,7 @@ Title:`
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
-        model: config.titleModel,
+        model: process.env.TITLE_MODEL ? config.titleModel : getActiveModel(),
         messages: [{ role: 'user', content: prompt }],
         stream: false,
       }),
